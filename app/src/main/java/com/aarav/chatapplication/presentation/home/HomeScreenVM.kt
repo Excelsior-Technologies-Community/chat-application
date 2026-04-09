@@ -3,6 +3,7 @@ package com.aarav.chatapplication.presentation.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.domain.model.User
 import com.aarav.chatapplication.domain.repository.AuthRepository
 import com.aarav.chatapplication.domain.repository.ChatListRepository
@@ -15,12 +16,15 @@ import com.aarav.chatapplication.presentation.model.ChatListEntry
 import com.aarav.chatapplication.presentation.model.DirectChatEntry
 import com.aarav.chatapplication.presentation.model.GroupChatEntry
 import com.aarav.chatapplication.utils.Result
+import com.aarav.chatapplication.webrtc.SignalingClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -40,7 +44,8 @@ class HomeScreenVM
     val authRepository: AuthRepository,
     val presenceRepository: PresenceRepository,
     val groupRepository: GroupRepository,
-    val groupChatRepository: GroupChatRepository
+    val groupChatRepository: GroupChatRepository,
+    val signalingClient: SignalingClient
 ) : ViewModel() {
     private var _uiState: MutableStateFlow<HomeUiState> = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -48,6 +53,22 @@ class HomeScreenVM
     init {
         getUserList()
         observeUserPresence()
+    }
+
+    private val _incomingCall = MutableSharedFlow<CallModel>()
+    val incomingCall = _incomingCall.asSharedFlow()
+
+    fun listenForIncomingCalls(userId: String) {
+        Log.d("CALL", "Listening for incoming calls")
+
+        viewModelScope.launch {
+            signalingClient.listenForIncomingCalls(userId)
+                .collect { call ->
+                    if (call.offer != null && call.answer == null) {
+                        _incomingCall.emit(call)
+                    }
+                }
+        }
     }
 
     private fun observeUserPresence() {

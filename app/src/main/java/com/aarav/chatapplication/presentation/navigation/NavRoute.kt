@@ -17,6 +17,13 @@ sealed class NavRoute(val path: String) {
             return "create_group/$userId"
         }
     }
+
+    object Call: NavRoute("call") {
+        fun createRoute(callId: String, callerId: String, receiverId: String, isCaller: Boolean): String {
+            return "call/$callId/$callerId/$receiverId/$isCaller"
+        }
+    }
+
     object Profile: NavRoute("profile")
     object Auth: NavRoute("auth")
-}
+}

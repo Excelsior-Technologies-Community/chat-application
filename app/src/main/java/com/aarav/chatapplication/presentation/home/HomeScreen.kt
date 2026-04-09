@@ -64,6 +64,7 @@ fun HomeScreen(
     navigateToChat: (String, String) -> Unit,
     navigateToGroupChat: (String, String, String) -> Unit,
     navigateToCreateGroup: (String) -> Unit,
+    navigateToCall: (String, String, String, Boolean) -> Unit,
     onLogout: () -> Unit,
     homeScreenVM: HomeScreenVM
 ) {
@@ -76,6 +77,16 @@ fun HomeScreen(
             homeScreenVM.observeChatList(it)
         }
         Log.i("CHAT", "chatList : " + uiState.chatList.toString())
+    }
+
+    LaunchedEffect(uiState.userId) {
+        uiState.userId?.let {
+            homeScreenVM.listenForIncomingCalls(it)
+
+            homeScreenVM.incomingCall.collect { call ->
+                navigateToCall(call.callId, call.callerId, call.receiverId, false)
+            }
+        }
     }
 
     var showCreateChatModal by remember {
@@ -487,9 +498,7 @@ fun GroupChatItem(
 
                 val displayMessage = if (entry.lastSenderName.isNotEmpty() && entry.lastMessage.isNotEmpty()) {
                     "${entry.lastSenderName}: ${entry.lastMessage}"
-                } else if (entry.lastMessage.isNotEmpty()) {
-                    entry.lastMessage
-                } else {
+                } else entry.lastMessage.ifEmpty {
                     "No messages yet"
                 }
 

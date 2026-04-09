@@ -1,16 +1,23 @@
 package com.aarav.chatapplication
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aarav.chatapplication.domain.repository.AuthRepository
@@ -58,6 +65,33 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val show = currentRoute in navItems
+
+                val context = LocalContext.current
+
+                val audioPermission = remember {
+                    Manifest.permission.RECORD_AUDIO
+                }
+
+                var isAudioPermissionGranted = remember {
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        audioPermission
+                    ) == PackageManager.PERMISSION_GRANTED
+                }
+
+
+                val launcher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) {
+                    granted ->
+                    isAudioPermissionGranted = granted
+                }
+
+                LaunchedEffect(isAudioPermissionGranted) {
+                    if(!isAudioPermissionGranted) {
+                        launcher.launch(audioPermission)
+                    }
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),

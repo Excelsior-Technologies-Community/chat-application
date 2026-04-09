@@ -14,6 +14,7 @@ import androidx.navigation.navArgument
 import com.aarav.chatapplication.presentation.auth.AuthScreen
 import com.aarav.chatapplication.presentation.chat.ChatScreen
 import com.aarav.chatapplication.domain.repository.AuthRepository
+import com.aarav.chatapplication.presentation.call.CallScreen
 import com.aarav.chatapplication.presentation.group.CreateGroupScreen
 import com.aarav.chatapplication.presentation.group.GroupChatScreen
 import com.aarav.chatapplication.presentation.home.HomeScreen
@@ -38,6 +39,7 @@ fun NavGraph(
         addChatScreen(navHostController, this, userId ?: "")
         addGroupChatScreen(navHostController, this)
         addCreateGroupScreen(navHostController, this)
+        addCallScreen(navHostController, this)
         addAuthScreen(navHostController, this)
         addProfileScreen(navHostController, this)
     }
@@ -59,6 +61,10 @@ fun addHomeScreen(navController: NavController, navGraphBuilder: NavGraphBuilder
             },
             navigateToCreateGroup = { userId ->
                 navController.navigate(NavRoute.CreateGroup.createRoute(userId))
+            },
+            navigateToCall = {
+                callId, callerId, receiverId, isCaller ->
+                navController.navigate(NavRoute.Call.createRoute(callId, callerId, receiverId, isCaller))
             },
             onLogout = {
                 navController.navigate(NavRoute.Auth.path) {
@@ -122,6 +128,16 @@ fun addChatScreen(navController: NavController, navGraphBuilder: NavGraphBuilder
             chatId = chatId,
             otherUserId = receiverId,
             myId = userId,
+            navigateToCall = {
+                navController.navigate(
+                    NavRoute.Call.createRoute(
+                        callId = chatId,
+                        callerId = userId,
+                        receiverId = receiverId,
+                        isCaller = true
+                    )
+                )
+            },
             chatViewModel = hiltViewModel()
         )
     }
@@ -172,4 +188,30 @@ fun addCreateGroupScreen(navController: NavController, navGraphBuilder: NavGraph
             viewModel = hiltViewModel()
         )
     }
-}
+}
+
+
+fun addCallScreen(navController: NavController, navGraphBuilder: NavGraphBuilder) {
+    navGraphBuilder.composable(
+        route = NavRoute.Call.path.plus("/{callId}/{callerId}/{receiverId}/{isCaller}"),
+        arguments = listOf(
+            navArgument("callId") { type = NavType.StringType },
+            navArgument("callerId") { type = NavType.StringType },
+            navArgument("receiverId") { type = NavType.StringType },
+            navArgument("isCaller") { type = NavType.BoolType }
+        )
+    ) {
+        val groupId = it.arguments?.getString("callId").toString()
+        val userId = it.arguments?.getString("callerId").toString()
+        val receiverId = it.arguments?.getString("receiverId").toString()
+        val senderName = it.arguments?.getBoolean("isCaller")
+
+        CallScreen(
+            callId = groupId,
+            callerId = userId,
+            receiverId = receiverId,
+            isCaller = senderName ?: false,
+            viewModel = hiltViewModel()
+        )
+    }
+}
