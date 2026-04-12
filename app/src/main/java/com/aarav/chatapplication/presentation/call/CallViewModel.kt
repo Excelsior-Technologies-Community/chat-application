@@ -8,8 +8,11 @@ import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.aarav.chatapplication.webrtc.SignalingClient
 import com.aarav.chatapplication.webrtc.WebRTCClient
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,6 +26,8 @@ class CallViewModel @Inject constructor(
     private var isCaller = false
     private var isOfferHandled = false
     private var isAnswerHandled = false
+    private var timerStarted = false
+
     private var activeCallId: String? = null
 
     @Volatile
@@ -40,13 +45,41 @@ class CallViewModel @Inject constructor(
     private val _callTime = MutableStateFlow(0)
     val callTime = _callTime.asStateFlow()
 
+    val _events = MutableSharedFlow<UiEvent>()
+    val events = _events.asSharedFlow()
+
+    private var connectionJob: Job? = null
+    private var signalingJob: Job? = null
+    private var iceOutgoingJob: Job? = null
+    private var iceIncomingJob: Job? = null
+
+    init {
+        connectionJob = viewModelScope.launch {
+            webRTCClient.connectionState.collect { state ->
+                if (!isEnding) {
+                    Log.d("CONNECTION", "STATE: $state")
+                    when (state) {
+                        "CONNECTED" -> {
+                            Log.d("CONNECTION", "connected: $state")
+                            _callState.value = "CONNECTED"
+                            startTimer()
+                        }
+                        "DISCONNECTED" -> _callState.value = "DISCONNECTED"
+                        "FAILED" -> _callState.value = "FAILED"
+                        else -> _callState.value = "CONNECTING"
+                    }
+                }
+            }
+        }
+    }
+
     fun startCall(call: CallModel) {
         isCaller = true
         activeCallId = call.callId
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
-        _callState.value = "CALLING"
+//        _callState.value = "CALLING"
 
         viewModelScope.launch {
             webRTCClient.init()
@@ -70,7 +103,7 @@ class CallViewModel @Inject constructor(
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
-        _callState.value = "RECEIVING"
+        //_callState.value = "RECEIVING"
 
         viewModelScope.launch {
             webRTCClient.init()
@@ -80,7 +113,13 @@ class CallViewModel @Inject constructor(
 
     private fun startObservers(callId: String) {
 
-        viewModelScope.launch {
+        //connectionJob?.cancel()
+        signalingJob?.cancel()
+        iceOutgoingJob?.cancel()
+        iceIncomingJob?.cancel()
+
+        signalingJob = viewModelScope.launch {
+
             signalingClient.listenForCall(callId)
                 .collect { call ->
                     if (isEnding) return@collect
@@ -92,7 +131,7 @@ class CallViewModel @Inject constructor(
 
                     if (!isCaller && call.offer != null && !isOfferHandled) {
                         isOfferHandled = true
-                        _callState.value = "CONNECTING"
+                        //_callState.value = "CONNECTING"
 
                         webRTCClient.onRemoteOfferReceived(call.offer) { answer ->
                             viewModelScope.launch {
@@ -105,28 +144,13 @@ class CallViewModel @Inject constructor(
 
                     if (isCaller && call.answer != null && !isAnswerHandled) {
                         isAnswerHandled = true
-                        _callState.value = "CONNECTING"
+                        //_callState.value = "CONNECTING"
                         webRTCClient.onAnswerReceived(call.answer)
                     }
                 }
         }
 
-        viewModelScope.launch {
-            webRTCClient.connectionState.collect { state ->
-                if (!isEnding) {
-                    when (state) {
-                        "CONNECTED" -> {
-                            _callState.value = "CONNECTED"
-                            startTimer()
-                        }
-                        "DISCONNECTED" -> _callState.value = "DISCONNECTED"
-                        "FAILED" -> _callState.value = "FAILED"
-                    }
-                }
-            }
-        }
-
-        viewModelScope.launch {
+        iceOutgoingJob = viewModelScope.launch {
             webRTCClient.iceCandidateFlow.collect { candidate ->
                 if (!isEnding) {
                     try {
@@ -145,7 +169,7 @@ class CallViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch {
+        iceIncomingJob = viewModelScope.launch {
             signalingClient.listenForCandidate(callId)
                 .collect { candidate ->
                     if (!isEnding) {
@@ -156,6 +180,8 @@ class CallViewModel @Inject constructor(
     }
 
     private fun startTimer() {
+        if (timerStarted) return
+        timerStarted = true
         viewModelScope.launch {
             while (true) {
                 delay(1000)
@@ -171,10 +197,12 @@ class CallViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 signalingClient.endCall(callId)
+
             } catch (e: Exception) {
                 Log.e("CALL", "Error ending call", e)
             }
             _callState.value = "ENDED"
+            _events.emit(UiEvent.EndCall)
             _callEnded.value = true
         }
     }
@@ -183,6 +211,9 @@ class CallViewModel @Inject constructor(
         if (isEnding) return
         isEnding = true
         _callState.value = "ENDED"
+        viewModelScope.launch {
+            _events.emit(UiEvent.EndCall)
+        }
         _callEnded.value = true
     }
 
@@ -195,6 +226,15 @@ class CallViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         webRTCClient.closeConnection()
+        connectionJob?.cancel()
+        signalingJob?.cancel()
+        iceOutgoingJob?.cancel()
+        iceIncomingJob?.cancel()
+
         activeCallId?.let { signalingClient.cleanupCallData(it) }
     }
+}
+
+sealed class UiEvent {
+    object EndCall : UiEvent()
 }

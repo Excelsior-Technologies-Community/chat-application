@@ -56,12 +56,21 @@ class WebRTCClient
         peerConnectionFactory = PeerConnectionFactory.builder()
             .createPeerConnectionFactory()
 
-        val iceServer = PeerConnection.IceServer
-            .builder("stun:stun.l.google.com:19302")
-            .createIceServer()
+        val iceServers = listOf(
+
+            // STUN
+            PeerConnection.IceServer.builder("stun:stun.l.google.com:19302")
+                .createIceServer(),
+
+            // TURN
+            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
+                .setUsername("openrelayproject")
+                .setPassword("openrelayproject")
+                .createIceServer()
+        )
 
         peerConnection = peerConnectionFactory?.createPeerConnection(
-            listOf(iceServer),
+            iceServers,
             peerConnectionObserver
         )
 
@@ -92,9 +101,9 @@ class WebRTCClient
         }
 
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-            Log.i("CALL", "onConnectionChange: " + newState?.name)
 
             if (!isClosed) {
+                Log.i("CALL", "onConnectionChange: " + newState?.name)
                 _connectionState.value = newState?.name ?: "UNKNOWN"
             }
         }
