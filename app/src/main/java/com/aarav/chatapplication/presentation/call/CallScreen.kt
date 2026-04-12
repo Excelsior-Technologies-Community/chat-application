@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.aarav.chatapplication.data.model.CallModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun CallScreen(
@@ -25,22 +26,36 @@ fun CallScreen(
     callerId: String,
     receiverId: String,
     isCaller: Boolean,
+    onCallEnd: () -> Unit,
     viewModel: CallViewModel
 ) {
 
     val context = LocalContext.current
 
-    val state by viewModel.connectionState.collectAsState()
+    val state by viewModel.callState.collectAsState()
 
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    val callEnded by viewModel.callEnded.collectAsState()
 
-    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-    audioManager.isSpeakerphoneOn = true
+    LaunchedEffect(callEnded) {
+        if (callEnded) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    LaunchedEffect(Unit) {
+            audioManager.isSpeakerphoneOn = false
+            audioManager.mode = AudioManager.MODE_NORMAL
+
+            onCallEnd()
+        }
+    }
+
+    LaunchedEffect(callId) {
+
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = true
+        audioManager.isMicrophoneMute = false
 
         if (isCaller) {
-
             viewModel.startCall(
                 CallModel(
                     callId = callId,
@@ -48,7 +63,6 @@ fun CallScreen(
                     receiverId = receiverId
                 )
             )
-
         } else {
             viewModel.receiveCall(callId)
         }
@@ -61,21 +75,23 @@ fun CallScreen(
     ) {
 
         Text(
-            text = when {
-                state == "NEW" && isCaller -> "Calling..."
-                state == "NEW" && !isCaller -> "Receiving Call"
-                state == "CONNECTED" -> "Connected"
-                state == "DISCONNECTED" -> "Disconnected"
-                state == "FAILED" -> "Failed"
-                state == "CLOSED" -> "Closed"
-                else -> "Connecting..."
+            text = when (state) {
+                "CALLING" -> "Calling..."
+                "RECEIVING" -> "Receiving Call..."
+                "CONNECTING" -> "Connecting..."
+                "CONNECTED" -> "Connected"
+                "DISCONNECTED" -> "Disconnected"
+                "FAILED" -> "Failed"
+                "CLOSED" -> "Call Ended"
+                "ENDED" -> "Call Ended"
+                else -> "Initializing..."
             }
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
         Button(onClick = {
-
+            viewModel.endCall(callId)
         }) {
             Text("End Call")
         }

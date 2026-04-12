@@ -6,6 +6,7 @@ data class CallModel(
     val receiverId: String = "",
     val offer: String? = null,
     val answer: String? = null,
+    val ended: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 )
 

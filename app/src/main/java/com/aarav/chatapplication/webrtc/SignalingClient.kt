@@ -43,13 +43,19 @@ class SignalingClient
             .await()
     }
 
-    fun listenForCall(callId: String): Flow<CallModel> = callbackFlow {
+    fun listenForCall(callId: String): Flow<CallModel?> = callbackFlow {
+
         val listener = object : ValueEventListener {
+
             override fun onDataChange(snapshot: DataSnapshot) {
-                val call = snapshot.getValue(CallModel::class.java)
-                call?.let {
-                    trySend(it)
+
+                if (!snapshot.exists()) {
+                    trySend(null)
+                    return
                 }
+
+                val call = snapshot.getValue(CallModel::class.java)
+                trySend(call)
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -57,9 +63,7 @@ class SignalingClient
             }
         }
 
-        callRef
-            .child(callId)
-            .addValueEventListener(listener)
+        callRef.child(callId).addValueEventListener(listener)
 
         awaitClose {
             callRef.child(callId).removeEventListener(listener)
@@ -78,8 +82,12 @@ class SignalingClient
 
                     val call = child.getValue(CallModel::class.java)
 
-                    call?.let {
-                        trySend(it)
+                    if (call != null &&
+                        call.offer != null &&
+                        call.answer == null &&
+                        !call.ended
+                    ) {
+                        trySend(call)
                     }
                 }
             }
@@ -154,5 +162,16 @@ class SignalingClient
         awaitClose {
             ref.removeEventListener(listener)
         }
+    }
+
+    suspend fun endCall(callId: String) {
+        callRef.child(callId)
+            .child("ended")
+            .setValue(true)
+            .await()
+    }
+
+    fun cleanupCallData(callId: String) {
+        callRef.child(callId).removeValue()
     }
 }

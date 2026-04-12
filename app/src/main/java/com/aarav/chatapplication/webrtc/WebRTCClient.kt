@@ -24,8 +24,11 @@ class WebRTCClient
     @ApplicationContext val context: android.content.Context
 ) {
 
-    private lateinit var peerConnectionFactory: PeerConnectionFactory
-    private lateinit var peerConnection: PeerConnection
+    private var peerConnectionFactory: PeerConnectionFactory? = null
+    private var peerConnection: PeerConnection? = null
+
+    @Volatile
+    private var isClosed = false
 
     private val _iceCandidateFlow = MutableSharedFlow<IceCandidate>(
         replay = 10
@@ -38,42 +41,39 @@ class WebRTCClient
 
     fun init() {
 
-        if (::peerConnection.isInitialized) return
+        if (peerConnection != null) return
 
-        // initialize WebRTC globally
+        isClosed = false
+        _connectionState.value = "NEW"
+
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(context)
                 .createInitializationOptions()
         )
 
-        // create factory
         peerConnectionFactory = PeerConnectionFactory.builder()
             .createPeerConnectionFactory()
 
-        // create ice server (STUN)
         val iceServer = PeerConnection.IceServer
             .builder("stun:stun.l.google.com:19302")
             .createIceServer()
 
-        // create peer connection
-        peerConnection = peerConnectionFactory.createPeerConnection(
+        peerConnection = peerConnectionFactory?.createPeerConnection(
             listOf(iceServer),
             peerConnectionObserver
-        )!!
+        )
 
-        // create audioTrack from audioSource
-        val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
-        val audioTrack = peerConnectionFactory.createAudioTrack("audioTrack", audioSource)
-
-        // attach audiotrack before offer/answer
-        peerConnection.addTrack(audioTrack)
-
+        val factory = peerConnectionFactory ?: return
+        val pc = peerConnection ?: return
+        val audioSource = factory.createAudioSource(MediaConstraints())
+        val audioTrack = factory.createAudioTrack("audioTrack", audioSource)
+        pc.addTrack(audioTrack)
     }
 
     private val peerConnectionObserver = object : PeerConnection.Observer {
         override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
 
-        override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {4
+        override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
 
         }
 
@@ -83,6 +83,7 @@ class WebRTCClient
         override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {}
 
         override fun onIceCandidate(candidate: IceCandidate?) {
+            if (isClosed) return
             candidate?.let {
                 _iceCandidateFlow.tryEmit(it)
             }
@@ -91,14 +92,18 @@ class WebRTCClient
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
             Log.i("CALL", "onConnectionChange: " + newState?.name)
 
-            _connectionState.value = newState?.name ?: "UNKNOWN"
+            if (!isClosed) {
+                _connectionState.value = newState?.name ?: "UNKNOWN"
+            }
         }
 
         override fun onTrack(transceiver: RtpTransceiver?) {
-            val track = transceiver?.receiver?.track()
 
-            if (track is AudioTrack) {
-                track.setEnabled(true)
+            if (!isClosed) {
+                val track = transceiver?.receiver?.track()
+                if (track is AudioTrack) {
+                    track.setEnabled(true)
+                }
             }
         }
 
@@ -116,9 +121,14 @@ class WebRTCClient
 
     fun createOffer(onOfferCreated: (SessionDescription) -> Unit) {
 
-        peerConnection.createOffer(object : SdpObserver {
+        if (isClosed) return
+        val pc = peerConnection ?: return
+
+
+        pc.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription) {
-                peerConnection.setLocalDescription(this, sdp)
+                if (isClosed) return
+                pc.setLocalDescription(this, sdp)
                 onOfferCreated(sdp)
             }
 
@@ -132,9 +142,15 @@ class WebRTCClient
     }
 
     fun createAnswer(onAnswerCreated: (SessionDescription) -> Unit) {
-        peerConnection.createAnswer(object : SdpObserver {
+
+        if (isClosed) return
+        val pc = peerConnection ?: return
+
+
+        pc.createAnswer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription) {
-                peerConnection.setLocalDescription(this, sdp)
+                if (isClosed) return
+                pc.setLocalDescription(this, sdp)
                 onAnswerCreated(sdp)
             }
 
@@ -151,12 +167,15 @@ class WebRTCClient
         offer: String,
         onAnswerCreated: (SessionDescription) -> Unit
     ) {
+        if (isClosed) return
+        val pc = peerConnection ?: return
+
         val session = SessionDescription(
             SessionDescription.Type.OFFER,
             offer
         )
 
-        peerConnection.setRemoteDescription(object : SdpObserver {
+        pc.setRemoteDescription(object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
 
             override fun onSetSuccess() {
@@ -171,12 +190,15 @@ class WebRTCClient
     }
 
     fun onAnswerReceived(answer: String) {
+        if (isClosed) return
+        val pc = peerConnection ?: return
+
         val session = SessionDescription(
             SessionDescription.Type.ANSWER,
             answer
         )
 
-        peerConnection.setRemoteDescription(object : SdpObserver {
+        pc.setRemoteDescription(object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
 
             override fun onSetSuccess() {}
@@ -189,13 +211,36 @@ class WebRTCClient
     }
 
     fun addIceCandidate(candidate: IceCandidateModel) {
+        if (isClosed) return
+        val pc = peerConnection ?: return
+
         val ice = IceCandidate(
             candidate.sdpMid,
             candidate.sdpMLineIndex,
             candidate.sdp
         )
 
-        peerConnection.addIceCandidate(ice)
+        pc.addIceCandidate(ice)
+    }
+
+    fun closeConnection() {
+        if (isClosed) return
+        isClosed = true
+
+        try {
+            peerConnection?.close()
+            peerConnection?.dispose()
+        } catch (e: Exception) {
+            Log.e("CALL", "Error closing peer connection", e)
+        }
+        peerConnection = null
+
+        try {
+            peerConnectionFactory?.dispose()
+        } catch (e: Exception) {
+            Log.e("CALL", "Error disposing factory", e)
+        }
+        peerConnectionFactory = null
     }
 
 

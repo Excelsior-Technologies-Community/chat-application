@@ -211,6 +211,9 @@ fun addCallScreen(navController: NavController, navGraphBuilder: NavGraphBuilder
             callerId = userId,
             receiverId = receiverId,
             isCaller = senderName ?: false,
+            onCallEnd = {
+                navController.popBackStack()
+            },
             viewModel = hiltViewModel()
         )
     }
