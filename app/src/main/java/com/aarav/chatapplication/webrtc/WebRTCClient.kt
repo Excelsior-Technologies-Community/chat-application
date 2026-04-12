@@ -39,6 +39,8 @@ class WebRTCClient
     private val _connectionState = MutableStateFlow("NEW")
     val connectionState = _connectionState.asStateFlow()
 
+    private var localAudioTrack: AudioTrack? = null
+
     fun init() {
 
         if (peerConnection != null) return
@@ -66,8 +68,8 @@ class WebRTCClient
         val factory = peerConnectionFactory ?: return
         val pc = peerConnection ?: return
         val audioSource = factory.createAudioSource(MediaConstraints())
-        val audioTrack = factory.createAudioTrack("audioTrack", audioSource)
-        pc.addTrack(audioTrack)
+        localAudioTrack = factory.createAudioTrack("audioTrack", audioSource)
+        pc.addTrack(localAudioTrack)
     }
 
     private val peerConnectionObserver = object : PeerConnection.Observer {
@@ -117,6 +119,11 @@ class WebRTCClient
 
         override fun onRenegotiationNeeded() {}
 
+    }
+
+    fun toggleMute(isMuted: Boolean) {
+        Log.d("CALL", "MUTE: $isMuted")
+        localAudioTrack?.setEnabled(!isMuted)
     }
 
     fun createOffer(onOfferCreated: (SessionDescription) -> Unit) {

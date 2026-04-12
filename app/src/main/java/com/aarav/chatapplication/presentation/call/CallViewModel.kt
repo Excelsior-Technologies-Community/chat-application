@@ -8,6 +8,7 @@ import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.aarav.chatapplication.webrtc.SignalingClient
 import com.aarav.chatapplication.webrtc.WebRTCClient
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -32,6 +33,12 @@ class CallViewModel @Inject constructor(
 
     private val _callEnded = MutableStateFlow(false)
     val callEnded = _callEnded.asStateFlow()
+
+    private val _isMuted = MutableStateFlow(false)
+    val isMuted = _isMuted.asStateFlow()
+
+    private val _callTime = MutableStateFlow(0)
+    val callTime = _callTime.asStateFlow()
 
     fun startCall(call: CallModel) {
         isCaller = true
@@ -108,7 +115,10 @@ class CallViewModel @Inject constructor(
             webRTCClient.connectionState.collect { state ->
                 if (!isEnding) {
                     when (state) {
-                        "CONNECTED" -> _callState.value = "CONNECTED"
+                        "CONNECTED" -> {
+                            _callState.value = "CONNECTED"
+                            startTimer()
+                        }
                         "DISCONNECTED" -> _callState.value = "DISCONNECTED"
                         "FAILED" -> _callState.value = "FAILED"
                     }
@@ -145,6 +155,15 @@ class CallViewModel @Inject constructor(
         }
     }
 
+    private fun startTimer() {
+        viewModelScope.launch {
+            while (true) {
+                delay(1000)
+                _callTime.value++
+            }
+        }
+    }
+
     fun endCall(callId: String) {
         if (isEnding) return
         isEnding = true
@@ -165,6 +184,12 @@ class CallViewModel @Inject constructor(
         isEnding = true
         _callState.value = "ENDED"
         _callEnded.value = true
+    }
+
+    fun toggleMute() {
+        val newState = !_isMuted.value
+        _isMuted.value = newState
+        webRTCClient.toggleMute(newState)
     }
 
     override fun onCleared() {

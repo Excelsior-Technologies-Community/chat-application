@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -13,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,11 +39,17 @@ fun CallScreen(
     val state by viewModel.callState.collectAsState()
 
     val callEnded by viewModel.callEnded.collectAsState()
+    val isMuted by viewModel.isMuted.collectAsState()
+
+    var isSpeakerOn by remember { mutableStateOf(true) }
+
+    val time by viewModel.callTime.collectAsState()
+
+
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     LaunchedEffect(callEnded) {
         if (callEnded) {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
             audioManager.isSpeakerphoneOn = false
             audioManager.mode = AudioManager.MODE_NORMAL
 
@@ -48,8 +58,6 @@ fun CallScreen(
     }
 
     LaunchedEffect(callId) {
-
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         audioManager.isSpeakerphoneOn = true
@@ -88,12 +96,35 @@ fun CallScreen(
             }
         )
 
+
+        Text("Time: ${time}s")
+
         Spacer(modifier = Modifier.height(20.dp))
 
-        Button(onClick = {
-            viewModel.endCall(callId)
-        }) {
-            Text("End Call")
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(onClick = {
+                viewModel.toggleMute()
+            }) {
+                Text(if (isMuted) "Unmute" else "Mute")
+            }
+
+            Button(onClick = {
+                isSpeakerOn = !isSpeakerOn
+                audioManager.isSpeakerphoneOn = isSpeakerOn
+            }) {
+                Text(if (isSpeakerOn) "Speaker ON" else "Speaker OFF")
+            }
+
+            Button(onClick = {
+                viewModel.endCall(callId)
+            }) {
+                Text("End Call")
+            }
         }
+
+
     }
 }
