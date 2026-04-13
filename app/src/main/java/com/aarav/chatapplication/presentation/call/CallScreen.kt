@@ -238,8 +238,9 @@ fun CallScreen(
             AndroidView(
                 factory = { localView },
                 modifier = Modifier
-                    .size(120.dp)
                     .clip(RoundedCornerShape(16.dp))
+
+                    .size(120.dp)
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
             )

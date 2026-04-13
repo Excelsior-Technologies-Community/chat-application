@@ -107,24 +107,15 @@ class WebRTCClient
 
         startLocalVideo()
 
-
-        peerConnection?.addTransceiver(
-            org.webrtc.MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-            RtpTransceiver.RtpTransceiverInit(
-                RtpTransceiver.RtpTransceiverDirection.SEND_RECV
-            )
-        )
-
-
-
         val factory = peerConnectionFactory ?: return
         val pc = peerConnection ?: return
         val audioSource = factory.createAudioSource(MediaConstraints())
         localAudioTrack = factory.createAudioTrack("audioTrack", audioSource)
 
-        pc.addTrack(localAudioTrack)
+        val streamIds = listOf("ARDAMS")
+        pc.addTrack(localAudioTrack, streamIds)
         localVideoTrack?.let {
-            pc.addTrack(it)
+            pc.addTrack(it, streamIds)
         }
 
     }
