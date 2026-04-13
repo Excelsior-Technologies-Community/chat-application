@@ -135,7 +135,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(callState) {
-                    if (callState == "ENDED") {
+                    if (callState == "IDLE") {
                         showCallBanner = false
                         callInfo = null
                     }

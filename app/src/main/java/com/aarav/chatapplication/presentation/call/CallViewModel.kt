@@ -162,7 +162,7 @@ class CallViewModel @Inject constructor(
                     if (isEnding) return@collect
 
                     if (call?.ended == true) {
-                        finishCall()
+                        finishCall(call.callId)
                         return@collect
                     }
 
@@ -269,10 +269,11 @@ class CallViewModel @Inject constructor(
             signalingClient.cleanupCallData(callId)
             activeCallId = null
             _callState.value = "IDLE"
+            isEnding = false
         }
     }
 
-    private fun finishCall() {
+    private fun finishCall(callId: String) {
         if (isEnding) return
         isEnding = true
         _callState.value = "ENDED"
@@ -298,13 +299,11 @@ class CallViewModel @Inject constructor(
             timerJob = null
 
             delay(1000)
-            if (activeCallId != null) {
-                signalingClient.cleanupCallData(activeCallId!!)
-            } else {
-                // if it was somehow null but finishCall triggered, we can't clean up data
-            }
+
+            signalingClient.cleanupCallData(callId)
             activeCallId = null
             _callState.value = "IDLE"
+            isEnding = false
 
         }
 
