@@ -1,6 +1,7 @@
 package com.aarav.chatapplication.webrtc
 
 import android.util.Log
+import android.view.SurfaceView
 import com.aarav.chatapplication.data.model.IceCandidateModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.AudioTrack
+import org.webrtc.Camera1Enumerator
 import org.webrtc.Camera2Enumerator
 import org.webrtc.DataChannel
 import org.webrtc.DefaultVideoDecoderFactory
@@ -43,17 +45,20 @@ class WebRTCClient
     )
     val iceCandidateFlow = _iceCandidateFlow.asSharedFlow()
 
-    private val _remoteVideoTrackFlow = MutableSharedFlow<VideoTrack>()
+    private val _remoteVideoTrackFlow = MutableSharedFlow<VideoTrack>(
+        replay = 1
+    )
     val remoteVideoTrackFlow = _remoteVideoTrackFlow.asSharedFlow()
 
     private val _connectionState = MutableStateFlow("NEW")
     val connectionState = _connectionState.asStateFlow()
 
     private var localAudioTrack: AudioTrack? = null
-    private var localVideoTrack: VideoTrack? = null
+    var localVideoTrack: VideoTrack? = null
     private var videoCapturer: VideoCapturer? = null
     private lateinit var eglBase: EglBase
     private var remoteVideoTrack: VideoTrack? = null
+
 
     fun init() {
 
@@ -100,22 +105,36 @@ class WebRTCClient
             peerConnectionObserver
         )
 
+        startLocalVideo()
+
+
+        peerConnection?.addTransceiver(
+            org.webrtc.MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+            RtpTransceiver.RtpTransceiverInit(
+                RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+            )
+        )
+
+
+
         val factory = peerConnectionFactory ?: return
         val pc = peerConnection ?: return
         val audioSource = factory.createAudioSource(MediaConstraints())
         localAudioTrack = factory.createAudioTrack("audioTrack", audioSource)
+
         pc.addTrack(localAudioTrack)
+        localVideoTrack?.let {
+            pc.addTrack(it)
+        }
 
     }
 
-    fun startLocalVideo(localView: SurfaceViewRenderer) {
-        val peerConnection = peerConnection ?: return
-        val peerConnectionFactory = peerConnectionFactory ?: return
 
-        eglBase = EglBase.create()
+    fun getEglContext() = eglBase.eglBaseContext
 
-        localView.init(eglBase.eglBaseContext, null)
-        localView.setMirror(true)
+    fun startLocalVideo(): VideoTrack? {
+        val peerConnection = peerConnection ?: return null
+        val peerConnectionFactory = peerConnectionFactory ?: return null
 
         videoCapturer = createCameraCapture()
 
@@ -128,22 +147,21 @@ class WebRTCClient
 
         videoCapturer?.initialize(
             surfaceTextureHelper,
-            localView.context,
+            context,
             videoSource.capturerObserver
         )
 
         videoCapturer?.startCapture(720, 1280, 30)
 
+        Log.d("CALL", "startCapture called")
+
         localVideoTrack = peerConnectionFactory.createVideoTrack("videoTrack", videoSource)
 
-        localVideoTrack?.addSink(localView)
-
-        peerConnection.addTrack(localVideoTrack)
-
+        return localVideoTrack
     }
 
     fun createCameraCapture(): VideoCapturer? {
-        val enumerator = Camera2Enumerator(context)
+        val enumerator = Camera1Enumerator(true)
 
         for (device in enumerator.deviceNames) {
             if(enumerator.isFrontFacing(device)) {
@@ -190,6 +208,7 @@ class WebRTCClient
                 }
 
                 if (track is VideoTrack) {
+                    Log.d("CALL", "Remote video track received")
                     remoteVideoTrack = track
                     _remoteVideoTrackFlow.tryEmit(track)
                 }
@@ -322,6 +341,16 @@ class WebRTCClient
         isClosed = true
 
         try {
+            videoCapturer?.stopCapture()
+            videoCapturer?.dispose()
+            videoCapturer = null
+
+            localVideoTrack?.dispose()
+            localVideoTrack = null
+
+            localAudioTrack?.dispose()
+            localAudioTrack = null
+
             peerConnection?.close()
             peerConnection?.dispose()
         } catch (e: Exception) {

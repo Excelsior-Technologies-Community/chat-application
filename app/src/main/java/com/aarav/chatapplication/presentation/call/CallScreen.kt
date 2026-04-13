@@ -5,6 +5,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,16 +18,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,24 +46,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.aarav.chatapplication.R
 import com.aarav.chatapplication.data.model.CallModel
 import kotlinx.coroutines.delay
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import org.webrtc.SurfaceViewRenderer
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CallScreen(
     callId: String,
@@ -65,6 +71,14 @@ fun CallScreen(
 ) {
 
     val context = LocalContext.current
+
+    val localView = remember {
+        SurfaceViewRenderer(context)
+    }
+
+    val remoteView = remember {
+        SurfaceViewRenderer(context)
+    }
 
     val state by viewModel.callState.collectAsState()
 
@@ -98,6 +112,49 @@ fun CallScreen(
     }
 
     LaunchedEffect(Unit) {
+        val eglContext = viewModel.getEglContext()
+
+        remoteView.init(eglContext, null)
+        remoteView.setEnableHardwareScaler(true)
+        remoteView.setZOrderMediaOverlay(false)
+
+        localView.init(eglContext, null)
+        localView.setEnableHardwareScaler(true)
+        localView.setZOrderMediaOverlay(true)
+
+        remoteView.setMirror(false)
+        localView.setMirror(true)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.localVideoTrack.collect { track ->
+            track?.let {
+                it.setEnabled(true)
+                it.addSink(localView)
+            }
+        }
+    }
+//    LaunchedEffect(state) {
+//
+//    }
+
+    LaunchedEffect(Unit) {
+        viewModel.remoteVideoTrack.collect { track ->
+            Log.d("CALL", "remote $track")
+            track.setEnabled(true)
+            track.addSink(remoteView)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            remoteView.release()
+            localView.release()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+
         viewModel.events.collect { event ->
             if (event is UiEvent.EndCall) {
                 audioManager.isSpeakerphoneOn = false
@@ -110,32 +167,96 @@ fun CallScreen(
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Column(
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = when (state) {
+                                "CALLING" -> "Calling..."
+                                "RECEIVING" -> "Receiving Call..."
+                                "CONNECTING" -> "Connecting..."
+                                "CONNECTED" -> "Connected"
+                                "DISCONNECTED" -> "Disconnected"
+                                "FAILED" -> "Failed"
+                                "CLOSED" -> "Call Ended"
+                                "ENDED" -> "Call Ended"
+                                else -> "Initializing..."
+                            },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
 
-        Column() {
-            Text(
-                text = when (state) {
-                    "CALLING" -> "Calling..."
-                    "RECEIVING" -> "Receiving Call..."
-                    "CONNECTING" -> "Connecting..."
-                    "CONNECTED" -> "Connected"
-                    "DISCONNECTED" -> "Disconnected"
-                    "FAILED" -> "Failed"
-                    "CLOSED" -> "Call Ended"
-                    "ENDED" -> "Call Ended"
-                    else -> "Initializing..."
+                        if (!callEnded && state == "CONNECTED") {
+                            Text(
+                                "Time: ${time}s",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = {},
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(0.45f),
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.arrow_back),
+                            contentDescription = "Back",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            if (!callEnded && state == "CONNECTED") {
-                Text("Time: ${time}s")
-            }
         }
+    ) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(it)
+        ) {
+
+            AndroidView(
+                factory = { remoteView },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            AndroidView(
+                factory = { localView },
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            )
+
+//        Column() {
+//            Text(
+//                text = when (state) {
+//                    "CALLING" -> "Calling..."
+//                    "RECEIVING" -> "Receiving Call..."
+//                    "CONNECTING" -> "Connecting..."
+//                    "CONNECTED" -> "Connected"
+//                    "DISCONNECTED" -> "Disconnected"
+//                    "FAILED" -> "Failed"
+//                    "CLOSED" -> "Call Ended"
+//                    "ENDED" -> "Call Ended"
+//                    else -> "Initializing..."
+//                }
+//            )
+//
+//            Spacer(modifier = Modifier.height(20.dp))
+//
+//            if (!callEnded && state == "CONNECTED") {
+//                Text("Time: ${time}s")
+//            }
+//        }
 
 
 //        Row(
@@ -162,22 +283,22 @@ fun CallScreen(
 //            }
 //        }
 
-        CallActionToolbar(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 54.dp),
-            isMicEnabled = !isMuted,
-            isSpeakerOn = isSpeakerOn,
-            onMicClick = { viewModel.toggleMute() },
-            onSpeakerClick = {
-                isSpeakerOn = !isSpeakerOn
-                audioManager.isSpeakerphoneOn = isSpeakerOn
+            CallActionToolbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 54.dp),
+                isMicEnabled = !isMuted,
+                isSpeakerOn = isSpeakerOn,
+                onMicClick = { viewModel.toggleMute() },
+                onSpeakerClick = {
+                    isSpeakerOn = !isSpeakerOn
+                    audioManager.isSpeakerphoneOn = isSpeakerOn
+                }
+            ) {
+                viewModel.endCall(callId)
             }
-        ) {
-            viewModel.endCall(callId)
+
         }
-
-
     }
 }
 

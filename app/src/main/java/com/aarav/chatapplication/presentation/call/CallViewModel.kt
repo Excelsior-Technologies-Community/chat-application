@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.webrtc.EglBase
+import org.webrtc.VideoTrack
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,6 +50,10 @@ class CallViewModel @Inject constructor(
     val _events = MutableSharedFlow<UiEvent>()
     val events = _events.asSharedFlow()
 
+    val remoteVideoTrack = webRTCClient.remoteVideoTrackFlow
+    private val _localVideoTrack = MutableStateFlow<VideoTrack?>(null)
+    val localVideoTrack = _localVideoTrack.asStateFlow()
+
     private var connectionJob: Job? = null
     private var signalingJob: Job? = null
     private var iceOutgoingJob: Job? = null
@@ -74,6 +80,10 @@ class CallViewModel @Inject constructor(
         }
     }
 
+    fun getEglContext(): EglBase.Context {
+        return webRTCClient.getEglContext()
+    }
+
     fun startCall(call: CallModel) {
         isCaller = true
         activeCallId = call.callId
@@ -85,6 +95,7 @@ class CallViewModel @Inject constructor(
 
         viewModelScope.launch {
             webRTCClient.init()
+            _localVideoTrack.value = webRTCClient.localVideoTrack
             signalingClient.createCall(call)
 
             webRTCClient.createOffer { sdp ->
@@ -110,8 +121,13 @@ class CallViewModel @Inject constructor(
 
         viewModelScope.launch {
             webRTCClient.init()
+            _localVideoTrack.value = webRTCClient.localVideoTrack
             startObservers(callId)
         }
+    }
+
+    fun getLocalVideoTrack(): VideoTrack? {
+        return webRTCClient.localVideoTrack
     }
 
     private fun startObservers(callId: String) {
