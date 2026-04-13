@@ -80,6 +80,7 @@ class CallViewModel @Inject constructor(
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
+        _callEnded.value = false
 //        _callState.value = "CALLING"
 
         viewModelScope.launch {
@@ -104,6 +105,7 @@ class CallViewModel @Inject constructor(
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
+        _callEnded.value = false
         //_callState.value = "RECEIVING"
 
         viewModelScope.launch {
@@ -198,7 +200,7 @@ class CallViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 signalingClient.endCall(callId)
-
+                webRTCClient.closeConnection()
             } catch (e: Exception) {
                 Log.e("CALL", "Error ending call", e)
             }
@@ -213,6 +215,7 @@ class CallViewModel @Inject constructor(
         isEnding = true
         _callState.value = "ENDED"
         viewModelScope.launch {
+            webRTCClient.closeConnection()
             _events.emit(UiEvent.EndCall)
         }
         _callEnded.value = true
@@ -239,7 +242,10 @@ class CallViewModel @Inject constructor(
         iceIncomingJob?.cancel()
         iceIncomingJob = null
 
-        activeCallId?.let { signalingClient.cleanupCallData(it) }
+        activeCallId?.let {
+            signalingClient.cleanupCallData(it)
+            activeCallId = null
+        }
     }
 }
 

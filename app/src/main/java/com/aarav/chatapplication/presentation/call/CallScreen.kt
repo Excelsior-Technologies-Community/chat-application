@@ -2,6 +2,9 @@ package com.aarav.chatapplication.presentation.call
 
 import android.content.Context
 import android.media.AudioManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +47,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -73,12 +77,6 @@ fun CallScreen(
 
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-//    LaunchedEffect(callEnded) {
-//        if (callEnded) {
-//
-//        }
-//    }
 
     LaunchedEffect(callId) {
 
@@ -134,7 +132,7 @@ fun CallScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            if (!callEnded) {
+            if (!callEnded && state == "CONNECTED") {
                 Text("Time: ${time}s")
             }
         }
@@ -265,6 +263,30 @@ fun IncomingCallBanner(
     onDecline: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
+    val context = LocalContext.current
+    val vibrator = context.getSystemService(Vibrator::class.java)
+
+    LaunchedEffect(Unit) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0, 500, 1000),
+                    0
+                )
+            )
+        } else {
+            vibrator?.vibrate(500)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            vibrator?.cancel()
+        }
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -282,7 +304,6 @@ fun IncomingCallBanner(
                 .padding(16.dp)
         ) {
 
-            // 🔹 Top Row (Avatar + Info)
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -324,13 +345,11 @@ fun IncomingCallBanner(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 🔹 Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
 
-                // ❌ Decline (Custom Red)
                 OutlinedButton(
                     onClick = onDecline,
                     modifier = Modifier.weight(1f),
@@ -343,7 +362,6 @@ fun IncomingCallBanner(
                     Text("Decline")
                 }
 
-                // ✅ Accept (Custom Green)
                 Button(
                     onClick = onAccept,
                     modifier = Modifier.weight(1f),

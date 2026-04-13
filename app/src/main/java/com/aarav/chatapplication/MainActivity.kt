@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,10 +83,21 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.RECORD_AUDIO
                 }
 
+                val cameraPermission = remember {
+                    Manifest.permission.CAMERA
+                }
+
                 var isAudioPermissionGranted = remember {
                     ContextCompat.checkSelfPermission(
                         context,
                         audioPermission
+                    ) == PackageManager.PERMISSION_GRANTED
+                }
+
+                var isCameraPermissionGranted = remember {
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        cameraPermission
                     ) == PackageManager.PERMISSION_GRANTED
                 }
 
@@ -95,16 +107,27 @@ class MainActivity : ComponentActivity() {
                 ) { granted ->
                     isAudioPermissionGranted = granted
                 }
+                val launcher2 = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    isCameraPermissionGranted = granted
+                }
 
-                LaunchedEffect(isAudioPermissionGranted) {
+                LaunchedEffect(isAudioPermissionGranted, isCameraPermissionGranted) {
                     if (!isAudioPermissionGranted) {
                         launcher.launch(audioPermission)
+                    }
+
+                    if(!isCameraPermissionGranted && isAudioPermissionGranted) {
+                        launcher2.launch(cameraPermission)
                     }
                 }
 
                 val mainViewModel: MainVM = hiltViewModel()
 
                 val callViewModel: CallViewModel = hiltViewModel()
+
+                val callState by callViewModel.callState.collectAsState()
 
                 var callInfo by remember {
                     mutableStateOf<CallModel?>(null)
@@ -115,12 +138,13 @@ class MainActivity : ComponentActivity() {
                         mainViewModel.listenForIncomingCalls(it)
 
                         mainViewModel.incomingCall.collect { call ->
-                            showCallBanner = true
-                            callInfo = call
+                            if (callInfo?.callId != call.callId) {
+                                showCallBanner = true
+                                callInfo = call
+                            }
                         }
                     }
                 }
-
 
 
                 /*
@@ -139,7 +163,7 @@ class MainActivity : ComponentActivity() {
                         currentUserId
                     )
 
-                    if(showCallBanner) {
+                    if (showCallBanner) {
                         IncomingCallBanner(
                             callerName = "Test",
                             onAccept = {
@@ -152,9 +176,10 @@ class MainActivity : ComponentActivity() {
                                     callViewModel.endCall(it.callId)
                                 }
                             },
-                            modifier = Modifier.align(
-                                androidx.compose.ui.Alignment.TopCenter
-                            )
+                            modifier = Modifier
+                                .align(
+                                    androidx.compose.ui.Alignment.TopCenter
+                                )
                                 .padding(top = 48.dp)
                         )
                     }

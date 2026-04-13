@@ -8,7 +8,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.AudioTrack
+import org.webrtc.Camera2Enumerator
 import org.webrtc.DataChannel
+import org.webrtc.DefaultVideoDecoderFactory
+import org.webrtc.DefaultVideoEncoderFactory
+import org.webrtc.EglBase
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
@@ -17,6 +21,10 @@ import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpTransceiver
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import org.webrtc.SurfaceTextureHelper
+import org.webrtc.SurfaceViewRenderer
+import org.webrtc.VideoCapturer
+import org.webrtc.VideoTrack
 import javax.inject.Inject
 
 class WebRTCClient
@@ -35,11 +43,17 @@ class WebRTCClient
     )
     val iceCandidateFlow = _iceCandidateFlow.asSharedFlow()
 
+    private val _remoteVideoTrackFlow = MutableSharedFlow<VideoTrack>()
+    val remoteVideoTrackFlow = _remoteVideoTrackFlow.asSharedFlow()
 
     private val _connectionState = MutableStateFlow("NEW")
     val connectionState = _connectionState.asStateFlow()
 
     private var localAudioTrack: AudioTrack? = null
+    private var localVideoTrack: VideoTrack? = null
+    private var videoCapturer: VideoCapturer? = null
+    private lateinit var eglBase: EglBase
+    private var remoteVideoTrack: VideoTrack? = null
 
     fun init() {
 
@@ -53,7 +67,19 @@ class WebRTCClient
                 .createInitializationOptions()
         )
 
+
+        eglBase = EglBase.create()
+
+
         peerConnectionFactory = PeerConnectionFactory.builder()
+            .setVideoEncoderFactory(
+                DefaultVideoEncoderFactory(
+                    eglBase.eglBaseContext,
+                    true,
+                    true
+                )
+            )
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
             .createPeerConnectionFactory()
 
         val iceServers = listOf(
@@ -79,6 +105,53 @@ class WebRTCClient
         val audioSource = factory.createAudioSource(MediaConstraints())
         localAudioTrack = factory.createAudioTrack("audioTrack", audioSource)
         pc.addTrack(localAudioTrack)
+
+    }
+
+    fun startLocalVideo(localView: SurfaceViewRenderer) {
+        val peerConnection = peerConnection ?: return
+        val peerConnectionFactory = peerConnectionFactory ?: return
+
+        eglBase = EglBase.create()
+
+        localView.init(eglBase.eglBaseContext, null)
+        localView.setMirror(true)
+
+        videoCapturer = createCameraCapture()
+
+        val surfaceTextureHelper = SurfaceTextureHelper.create(
+            "CaptureThread",
+            eglBase.eglBaseContext
+        )
+
+        val videoSource = peerConnectionFactory.createVideoSource(false)
+
+        videoCapturer?.initialize(
+            surfaceTextureHelper,
+            localView.context,
+            videoSource.capturerObserver
+        )
+
+        videoCapturer?.startCapture(720, 1280, 30)
+
+        localVideoTrack = peerConnectionFactory.createVideoTrack("videoTrack", videoSource)
+
+        localVideoTrack?.addSink(localView)
+
+        peerConnection.addTrack(localVideoTrack)
+
+    }
+
+    fun createCameraCapture(): VideoCapturer? {
+        val enumerator = Camera2Enumerator(context)
+
+        for (device in enumerator.deviceNames) {
+            if(enumerator.isFrontFacing(device)) {
+                return enumerator.createCapturer(device, null)
+            }
+        }
+
+        return null
     }
 
     private val peerConnectionObserver = object : PeerConnection.Observer {
@@ -114,6 +187,11 @@ class WebRTCClient
                 val track = transceiver?.receiver?.track()
                 if (track is AudioTrack) {
                     track.setEnabled(true)
+                }
+
+                if (track is VideoTrack) {
+                    remoteVideoTrack = track
+                    _remoteVideoTrackFlow.tryEmit(track)
                 }
             }
         }
