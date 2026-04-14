@@ -3,8 +3,8 @@ package com.aarav.chatapplication.presentation.navigation
 sealed class NavRoute(val path: String) {
     object Home: NavRoute("home")
     object Chat: NavRoute("chat") {
-        fun createRoute(receiverId: String, userId: String): String {
-            return "chat/$receiverId/$userId"
+        fun createRoute(receiverId: String, userId: String, currentUsername: String): String {
+            return "chat/$receiverId/$userId/$currentUsername"
         }
     }
     object GroupChat: NavRoute("group_chat") {
@@ -19,8 +19,8 @@ sealed class NavRoute(val path: String) {
     }
 
     object Call: NavRoute("call") {
-        fun createRoute(callId: String, callerId: String, receiverId: String, isCaller: Boolean): String {
-            return "call/$callId/$callerId/$receiverId/$isCaller"
+        fun createRoute(callId: String, callerId: String, callerName: String, receiverId: String, isCaller: Boolean): String {
+            return "call/$callId/$callerId/$callerName/$receiverId/$isCaller"
         }
     }
 

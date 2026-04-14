@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
+import com.aarav.chatapplication.domain.repository.AuthRepository
+import com.aarav.chatapplication.domain.repository.UserRepository
 import com.aarav.chatapplication.webrtc.SignalingClient
 import com.aarav.chatapplication.webrtc.WebRTCClient
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,10 +26,12 @@ import javax.inject.Inject
 @HiltViewModel
 class CallViewModel @Inject constructor(
     private val signalingClient: SignalingClient,
-    private val webRTCClient: WebRTCClient
+    private val webRTCClient: WebRTCClient,
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private var isCaller = false
+    private var callerName = ""
     private var isOfferHandled = false
     private var isAnswerHandled = false
     private var timerStarted = false
@@ -101,6 +105,7 @@ class CallViewModel @Inject constructor(
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
+        _isMuted.value = false
         timerStarted = false
         _callTime.value = 0
         // cancel and cleanly reset timer before initialization
@@ -133,6 +138,7 @@ class CallViewModel @Inject constructor(
         isEnding = false
         timerStarted = false
         _callTime.value = 0
+        _isMuted.value = false
         timerJob?.cancel()
         _callEnded.value = false
         _callState.value = "RECEIVING"
@@ -146,6 +152,10 @@ class CallViewModel @Inject constructor(
 
     fun getLocalVideoTrack(): VideoTrack? {
         return webRTCClient.localVideoTrack
+    }
+
+    fun toggleCamera() {
+        webRTCClient.switchCamera()
     }
 
     private fun startObservers(callId: String) {
@@ -242,7 +252,7 @@ class CallViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("CALL", "Error ending call", e)
             }
-            
+
             // using trySend() instead of send(), if the user clicks decline from the home banner
             // without ever entering the CallScreen, there are no active collectors observing events
             // send() would suspend the coroutine indefinitely waiting for one, permanently freezing the logic below it
@@ -315,12 +325,18 @@ class CallViewModel @Inject constructor(
         webRTCClient.toggleMute(newState)
     }
 
+    fun getUserInfo(userId: String) {
+        viewModelScope.launch {
+            userRepository.findUserByUserId(userId).collect {
+                callerName = it.name ?: "Test"
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
 
         Log.d("MYTAG", "callvm cleared")
-
-
     }
 }
 

@@ -34,6 +34,7 @@ import com.aarav.chatapplication.presentation.navigation.NavRoute
 import com.aarav.chatapplication.ui.theme.AppTheme
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -118,21 +119,41 @@ class MainActivity : ComponentActivity() {
                         launcher.launch(audioPermission)
                     }
 
-                    if(!isCameraPermissionGranted && isAudioPermissionGranted) {
+                    if (!isCameraPermissionGranted && isAudioPermissionGranted) {
                         launcher2.launch(cameraPermission)
                     }
                 }
 
                 val mainViewModel: MainVM = hiltViewModel()
 
+//                LaunchedEffect(currentUserId) {
+//                    currentUserId?.let {
+//                        mainViewModel.getCurrentUser(it)
+//                    }
+//                }
+//
+//                val currentUser by mainViewModel.currentUser.collectAsState()
+
                 val callViewModel: CallViewModel = hiltViewModel()
+
+                val call by mainViewModel.incomingCall.collectAsState()
 
                 val callState by callViewModel.callState.collectAsState()
                 val callEnded by callViewModel.callEnded.collectAsState()
 
+
                 var callInfo by remember {
                     mutableStateOf<CallModel?>(null)
                 }
+
+                LaunchedEffect(call) {
+                    call?.let {
+                        callInfo = it
+                    } ?: run {
+                        callInfo = null
+                    }
+                }
+
 
                 LaunchedEffect(callState) {
                     if (callState == "IDLE") {
@@ -143,18 +164,24 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(currentUserId) {
                     currentUserId?.let {
+
                         mainViewModel.listenForIncomingCalls(it)
 
-                        mainViewModel.incomingCall.collect { call ->
-                            if (
-                                callState == "IDLE" &&
-                                !showCallBanner &&
-                                callInfo == null
-                            ) {
-                                showCallBanner = true
-                                callInfo = call
-                            }
-                        }
+//                        launch {
+//                            mainViewModel.incomingCall.collect { call ->
+//                                if (call != null && callState == "IDLE") {
+//                                    showCallBanner = true
+//                                    callInfo = call
+//                                }
+//                            }
+//                        }
+//
+//                        launch {
+//                            mainViewModel.callEnded.collect {
+//                                showCallBanner = false
+//                                callInfo = null
+//                            }
+//                        }
                     }
                 }
 
@@ -175,18 +202,22 @@ class MainActivity : ComponentActivity() {
                         currentUserId
                     )
 
-                    if (showCallBanner) {
+                    if (call != null && callState == "IDLE") {
                         IncomingCallBanner(
-                            callerName = "Test",
+                            callerName = if (callInfo?.callerName.isNullOrBlank())
+                                "User"
+                            else
+                                callInfo?.callerName!!,
                             onAccept = {
                                 showCallBanner = false
-                                navController.navigate("call/${callInfo?.callId}/${callInfo?.callerId}/${callInfo?.receiverId}/${false}")
+                                navController.navigate("call/${callInfo?.callId}/${callInfo?.callerId}/${callInfo?.callerName}/${callInfo?.receiverId}/${false}")
                             },
                             onDecline = {
                                 showCallBanner = false
                                 callInfo?.let {
                                     callViewModel.endCall(it.callId)
                                 }
+                                callInfo = null
                             },
                             modifier = Modifier
                                 .align(

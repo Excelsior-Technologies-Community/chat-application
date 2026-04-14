@@ -66,15 +66,17 @@ import com.posthog.PostHog
 fun HomeScreen(
     callViewModel: CallViewModel,
     navController: NavController,
-    navigateToChat: (String, String) -> Unit,
+    navigateToChat: (String, String, String) -> Unit,
     navigateToGroupChat: (String, String, String) -> Unit,
     navigateToCreateGroup: (String) -> Unit,
-    navigateToCall: (String, String, String, Boolean) -> Unit,
+    navigateToCall: (String, String, String, String, Boolean) -> Unit,
     onLogout: () -> Unit,
     homeScreenVM: HomeScreenVM
 ) {
 
     val uiState by homeScreenVM.uiState.collectAsState()
+
+    val currentUser by homeScreenVM.currentUser.collectAsState()
 
     Log.i("USER", "userId: ${uiState.userId}")
     LaunchedEffect(uiState.userId) {
@@ -196,7 +198,7 @@ fun HomeScreen(
                 uiState.userList,
                 onDismiss = { showCreateChatModal = false }) { receiverId ->
                 uiState.userId?.let { userId ->
-                    navigateToChat(receiverId, userId)
+                    navigateToChat(receiverId, userId, uiState.currentUserName)
                 }
             }
         }
@@ -289,7 +291,7 @@ fun HomeScreen(
                         is DirectChatEntry -> {
                             DirectChatItem(entry) {
                                 uiState.userId?.let { userId ->
-                                    navigateToChat(entry.otherUserId, userId)
+                                    navigateToChat(entry.otherUserId, userId, uiState.currentUserName)
                                 }
                             }
                         }

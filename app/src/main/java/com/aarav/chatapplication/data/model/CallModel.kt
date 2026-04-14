@@ -3,6 +3,7 @@ package com.aarav.chatapplication.data.model
 data class CallModel(
     val callId: String = "",
     val callerId: String = "",
+    val callerName: String? = null,
     val receiverId: String = "",
     val offer: String? = null,
     val answer: String? = null,

@@ -82,13 +82,15 @@ class SignalingClient
 
                     val call = child.getValue(CallModel::class.java)
 
-                    if (call != null &&
-                        call.offer != null &&
-                        call.answer == null &&
-                        !call.ended
-                    ) {
+                    if (call != null) {
                         trySend(call)
                     }
+
+                    /*
+                      call.offer != null &&
+                      call.answer == null
+                        && !call.ended
+                     */
                 }
             }
 

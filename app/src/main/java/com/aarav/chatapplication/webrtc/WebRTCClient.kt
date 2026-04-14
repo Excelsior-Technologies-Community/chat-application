@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.AudioTrack
 import org.webrtc.Camera1Enumerator
 import org.webrtc.Camera2Enumerator
+import org.webrtc.CameraVideoCapturer
 import org.webrtc.DataChannel
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
@@ -56,6 +57,7 @@ class WebRTCClient
     private var localAudioTrack: AudioTrack? = null
     var localVideoTrack: VideoTrack? = null
     private var videoCapturer: VideoCapturer? = null
+    private var isFrontCamera = true
     private lateinit var eglBase: EglBase
     private var remoteVideoTrack: VideoTrack? = null
 
@@ -151,16 +153,27 @@ class WebRTCClient
         return localVideoTrack
     }
 
-    fun createCameraCapture(): VideoCapturer? {
+    fun createCameraCapture(): CameraVideoCapturer? {
         val enumerator = Camera1Enumerator(true)
 
         for (device in enumerator.deviceNames) {
-            if(enumerator.isFrontFacing(device)) {
+            if (isFrontCamera && enumerator.isFrontFacing(device)) {
+                return enumerator.createCapturer(device, null)
+            } else if (!isFrontCamera && enumerator.isBackFacing(device)) {
                 return enumerator.createCapturer(device, null)
             }
         }
 
         return null
+    }
+
+    fun switchCamera() {
+        val capturer = videoCapturer
+
+        if (capturer is CameraVideoCapturer) {
+            capturer.switchCamera(null)
+            isFrontCamera = !isFrontCamera
+        }
     }
 
     private val peerConnectionObserver = object : PeerConnection.Observer {

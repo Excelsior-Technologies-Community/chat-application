@@ -65,6 +65,7 @@ fun CallScreen(
     callId: String,
     callerId: String,
     receiverId: String,
+    callerName: String,
     isCaller: Boolean,
     onCallEnd: () -> Unit,
     viewModel: CallViewModel
@@ -103,7 +104,8 @@ fun CallScreen(
                 CallModel(
                     callId = callId,
                     callerId = callerId,
-                    receiverId = receiverId
+                    receiverId = receiverId,
+                    callerName = callerName
                 )
             )
         } else {
@@ -239,7 +241,6 @@ fun CallScreen(
                 factory = { localView },
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-
                     .size(120.dp)
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
@@ -302,10 +303,14 @@ fun CallScreen(
                 onSpeakerClick = {
                     isSpeakerOn = !isSpeakerOn
                     audioManager.isSpeakerphoneOn = isSpeakerOn
+                },
+                onEndCallClick = {
+                    viewModel.endCall(callId)
+                },
+                toggleCamera = {
+                    viewModel.toggleCamera()
                 }
-            ) {
-                viewModel.endCall(callId)
-            }
+            )
 
         }
     }
@@ -319,7 +324,8 @@ fun CallActionToolbar(
     isSpeakerOn: Boolean,
     onMicClick: () -> Unit,
     onSpeakerClick: () -> Unit,
-    onEndCallClick: () -> Unit
+    onEndCallClick: () -> Unit,
+    toggleCamera: () -> Unit
 ) {
 
     val enabledContainer = MaterialTheme.colorScheme.surface
@@ -337,6 +343,19 @@ fun CallActionToolbar(
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
+        IconButton(
+            onClick = toggleCamera,
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = enabledContainer,
+                contentColor = contentColor
+            ),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.flip_camera),
+                contentDescription = "Switch Camera"
+            )
+        }
+
         IconButton(
             colors = IconButtonDefaults.iconButtonColors(
                 containerColor = if (isMicEnabled) enabledContainer else disabledContainer,
@@ -365,7 +384,7 @@ fun CallActionToolbar(
         }
 
         VerticalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
+            color = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.height(32.dp)
         )
 
@@ -448,7 +467,7 @@ fun IncomingCallBanner(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = callerName.first().uppercase(),
+                        text = callerName.take(1).uppercase(),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp

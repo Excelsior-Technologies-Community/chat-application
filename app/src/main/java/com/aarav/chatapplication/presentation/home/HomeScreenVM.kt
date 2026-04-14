@@ -55,6 +55,18 @@ class HomeScreenVM
         observeUserPresence()
     }
 
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser = _currentUser.asStateFlow()
+
+    fun getCurrentUser(currentUserId: String) {
+        viewModelScope.launch {
+            userRepository.findUserByUserId(currentUserId)
+                .collect {
+                    _currentUser.value = it
+                }
+        }
+    }
+
     private val _incomingCall = MutableSharedFlow<CallModel>()
     val incomingCall = _incomingCall.asSharedFlow()
 
@@ -94,6 +106,7 @@ class HomeScreenVM
             userRepository.findUserByUserId(myId)
                 .catch { }
                 .collect { user ->
+                    Log.d("MYTAG", "useranem : ${user.name}")
                     _uiState.update { it.copy(currentUserName = user.name ?: "You") }
                 }
         }

@@ -70,6 +70,7 @@ fun ChatScreen(
     chatId: String,
     myId: String,
     otherUserId: String,
+    currentUsername: String,
     back: () -> Unit,
     navigateToCall: () -> Unit,
     chatViewModel: ChatViewModel
