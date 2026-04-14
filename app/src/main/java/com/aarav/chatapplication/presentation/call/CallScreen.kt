@@ -1,6 +1,8 @@
 package com.aarav.chatapplication.presentation.call
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
@@ -93,6 +95,29 @@ fun CallScreen(
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
+    val focusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setAcceptsDelayedFocusGain(false)
+            .setOnAudioFocusChangeListener {}
+            .build()
+    } else null
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        audioManager.requestAudioFocus(focusRequest!!)
+    } else {
+        audioManager.requestAudioFocus(
+            null,
+            AudioManager.STREAM_VOICE_CALL,
+            AudioManager.AUDIOFOCUS_GAIN
+        )
+    }
+
     LaunchedEffect(callId) {
 
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
@@ -166,8 +191,15 @@ fun CallScreen(
 
         viewModel.events.collect { event ->
             if (event is UiEvent.EndCall) {
-                audioManager.isSpeakerphoneOn = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    audioManager.abandonAudioFocusRequest(focusRequest!!)
+                } else {
+                    audioManager.abandonAudioFocus(null)
+                }
+
                 audioManager.mode = AudioManager.MODE_NORMAL
+                audioManager.isSpeakerphoneOn = false
+                audioManager.isMicrophoneMute = false
 
                 delay(800)
 

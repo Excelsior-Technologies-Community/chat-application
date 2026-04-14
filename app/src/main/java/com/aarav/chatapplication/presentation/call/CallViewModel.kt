@@ -5,19 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
-import com.aarav.chatapplication.domain.repository.AuthRepository
 import com.aarav.chatapplication.domain.repository.UserRepository
 import com.aarav.chatapplication.webrtc.SignalingClient
 import com.aarav.chatapplication.webrtc.WebRTCClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.webrtc.EglBase
 import org.webrtc.VideoTrack
@@ -67,6 +64,8 @@ class CallViewModel @Inject constructor(
     private var iceOutgoingJob: Job? = null
     private var iceIncomingJob: Job? = null
     private var timerJob: Job? = null
+    private var isAnswered = false
+    private var timeoutJob: Job? = null
 
     init {
         connectionJob = viewModelScope.launch {
@@ -86,6 +85,7 @@ class CallViewModel @Inject constructor(
                             // ignore "NEW" state from WebRTC, if we don't, it instantly maps to IDLE and
                             // overwrites the "CALLING" or "RECEIVING" UI text
                         }
+
                         else -> {
                             _callState.value = "CONNECTING"
                         }
@@ -127,6 +127,17 @@ class CallViewModel @Inject constructor(
             }
 
             startObservers(call.callId)
+        }
+
+        timeoutJob?.cancel()
+
+        timeoutJob = viewModelScope.launch {
+            delay(30_000)
+
+            if (!isAnswered && !isEnding) {
+                Log.d("CALL", "Timeout reached, ending call")
+                activeCallId?.let { endCall(it) }
+            }
         }
     }
 
@@ -191,6 +202,8 @@ class CallViewModel @Inject constructor(
 
                     if (isCaller && call?.answer != null && !isAnswerHandled) {
                         isAnswerHandled = true
+                        isAnswered = true
+                        timeoutJob?.cancel()
                         _callState.value = "CONNECTING"
                         webRTCClient.onAnswerReceived(call.answer)
                     }
@@ -307,6 +320,9 @@ class CallViewModel @Inject constructor(
             iceIncomingJob = null
             timerJob?.cancel()
             timerJob = null
+
+            timeoutJob?.cancel()
+            timeoutJob = null
 
             delay(1000)
 
