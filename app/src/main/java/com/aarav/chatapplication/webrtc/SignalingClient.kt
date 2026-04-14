@@ -1,6 +1,7 @@
 package com.aarav.chatapplication.webrtc
 
 import com.aarav.chatapplication.data.model.CallModel
+import com.aarav.chatapplication.data.model.CallHistoryModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
@@ -175,5 +176,16 @@ class SignalingClient
 
     fun cleanupCallData(callId: String) {
         callRef.child(callId).removeValue()
+    }
+
+    suspend fun setBusy(callId: String) {
+        callRef.child(callId).child("isBusy").setValue(true).await()
+        callRef.child(callId).child("ended").setValue(true).await()
+    }
+
+    suspend fun saveCallHistory(history: CallHistoryModel) {
+        val rootRef = firebaseDatabase.reference.child("callHistory").push()
+        val generatedId = rootRef.key ?: ""
+        rootRef.setValue(history.copy(historyId = generatedId)).await()
     }
 }

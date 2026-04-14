@@ -40,8 +40,8 @@ class MainVM
                     }
 
                     if (call.offer != null && call.answer == null) {
-                        if (callStateManager.callState.value != "IDLE") {
-                            signalingClient.endCall(call.callId)
+                        if (callStateManager.callState.value != "IDLE" && call.callId != callStateManager.activeCallId) {
+                            signalingClient.setBusy(call.callId)
                         } else {
                             _incomingCall.value = call
                         }

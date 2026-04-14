@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aarav.chatapplication.data.model.CallModel
+import com.aarav.chatapplication.data.model.CallHistoryModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.aarav.chatapplication.domain.repository.UserRepository
 import com.aarav.chatapplication.webrtc.SignalingClient
@@ -36,6 +37,8 @@ class CallViewModel @Inject constructor(
     private var timerStarted = false
 
     private var activeCallId: String? = null
+    private var activeCallerId: String = ""
+    private var activeReceiverId: String = ""
 
     @Volatile
     private var isEnding = false
@@ -103,6 +106,9 @@ class CallViewModel @Inject constructor(
     fun startCall(call: CallModel) {
         isCaller = true
         activeCallId = call.callId
+        callStateManager.activeCallId = call.callId
+        activeCallerId = call.callerId
+        activeReceiverId = call.receiverId
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
@@ -137,6 +143,7 @@ class CallViewModel @Inject constructor(
 
             if (!isAnswered && !isEnding) {
                 Log.d("CALL", "Timeout reached, ending call")
+                callStateManager.updateState("MISSED")
                 activeCallId?.let { endCall(it) }
             }
         }
@@ -145,6 +152,7 @@ class CallViewModel @Inject constructor(
     fun receiveCall(callId: String) {
         isCaller = false
         activeCallId = callId
+        callStateManager.activeCallId = callId
         isOfferHandled = false
         isAnswerHandled = false
         isEnding = false
@@ -184,7 +192,13 @@ class CallViewModel @Inject constructor(
                     if (isEnding) return@collect
 
                     if (call?.ended == true) {
-                        finishCall(call.callId)
+                        if (call.isBusy) {
+                            finishCall(call.callId, "BUSY")
+                        } else if (!isAnswered && isCaller) {
+                            finishCall(call.callId, "REJECTED")
+                        } else {
+                            finishCall(call.callId, "ENDED")
+                        }
                         return@collect
                     }
 
@@ -253,6 +267,17 @@ class CallViewModel @Inject constructor(
 
     fun endCall(callId: String) {
         if (isEnding) return
+
+        val currentStatus = callStateManager.callState.value
+        val finalStatus = when {
+            currentStatus == "MISSED" -> "missed"
+            currentStatus == "BUSY" -> "busy"
+            currentStatus == "REJECTED" -> "rejected"
+            !isAnswered -> "missed"
+            else -> "completed"
+        }
+        saveHistoryIfNeeded(finalStatus)
+
         isEnding = true
 
         viewModelScope.launch {
@@ -260,7 +285,7 @@ class CallViewModel @Inject constructor(
                 signalingClient.endCall(callId)
                 webRTCClient.closeConnection()
 
-                callStateManager.updateState("ENDED")
+                callStateManager.updateState(if (currentStatus in listOf("MISSED", "BUSY", "REJECTED")) currentStatus else "ENDED")
                 _callEnded.value = true
 
             } catch (e: Exception) {
@@ -297,10 +322,19 @@ class CallViewModel @Inject constructor(
         }
     }
 
-    private fun finishCall(callId: String) {
+    private fun finishCall(callId: String, statusString: String = "ENDED") {
         if (isEnding) return
+
+        val finalStatus = when (statusString) {
+            "BUSY" -> "busy"
+            "REJECTED" -> "rejected"
+            "MISSED" -> "missed"
+            else -> if (isAnswered) "completed" else "missed"
+        }
+        saveHistoryIfNeeded(finalStatus)
+
         isEnding = true
-        callStateManager.updateState("ENDED")
+        callStateManager.updateState(statusString)
         viewModelScope.launch {
             webRTCClient.closeConnection()
             _events.trySend(UiEvent.EndCall)
@@ -346,6 +380,25 @@ class CallViewModel @Inject constructor(
         viewModelScope.launch {
             userRepository.findUserByUserId(userId).collect {
                 callerName = it.name ?: "Test"
+            }
+        }
+    }
+
+    private fun saveHistoryIfNeeded(finalStatus: String) {
+        if (!isCaller) return
+        if (activeCallerId.isEmpty() || activeReceiverId.isEmpty()) return
+
+        val history = CallHistoryModel(
+            callerId = activeCallerId,
+            receiverId = activeReceiverId,
+            duration = _callTime.value.toLong(),
+            status = finalStatus
+        )
+        viewModelScope.launch {
+            try {
+                signalingClient.saveCallHistory(history)
+            } catch (e: Exception) {
+                Log.e("CALL", "Failed to save history", e)
             }
         }
     }

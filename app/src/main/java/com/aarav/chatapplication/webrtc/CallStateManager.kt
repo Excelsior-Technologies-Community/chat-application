@@ -11,7 +11,12 @@ class CallStateManager @Inject constructor() {
     private val _callState = MutableStateFlow("IDLE")
     val callState: StateFlow<String> = _callState.asStateFlow()
 
+    var activeCallId: String? = null
+
     fun updateState(newState: String) {
         _callState.value = newState
+        if (newState == "IDLE") {
+            activeCallId = null
+        }
     }
 }

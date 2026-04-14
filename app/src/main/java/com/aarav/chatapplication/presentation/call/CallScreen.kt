@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.RingtoneManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -186,6 +187,19 @@ fun CallScreen(
 //
 //    }
 
+    LaunchedEffect(state) {
+        if (state == "BUSY") {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 100)
+                toneGen.startTone(ToneGenerator.TONE_SUP_BUSY, 2000)
+                kotlinx.coroutines.delay(2000)
+                toneGen.release()
+            } catch (e: Exception) {
+                Log.e("CALL", "Tone fail", e)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.remoteVideoTrack.collect { track ->
 
@@ -224,7 +238,7 @@ fun CallScreen(
                 audioManager.isSpeakerphoneOn = false
                 audioManager.isMicrophoneMute = false
 
-                delay(800)
+                delay(1000)
 
                 onCallEnd()
             }
@@ -250,16 +264,6 @@ fun CallScreen(
                     .alpha(videoAlpha)
             )
 
-            AndroidView(
-                factory = { localView },
-                modifier = Modifier
-                    .padding(top = 78.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .size(120.dp)
-                    .align(Alignment.TopEnd)
-                    .padding(horizontal = 16.dp)
-            )
-
             if (!videoReady) {
                 Box(
                     modifier = Modifier
@@ -270,6 +274,16 @@ fun CallScreen(
                     Text(callerName, color = Color.White, fontSize = 22.sp)
                 }
             }
+
+            AndroidView(
+                factory = { localView },
+                modifier = Modifier
+                    .padding(top = 78.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .size(120.dp)
+                    .align(Alignment.TopEnd)
+                    .padding(horizontal = 16.dp)
+            )
 
 //        Column() {
 //            Text(
@@ -363,6 +377,10 @@ fun CallScreen(
                             "DISCONNECTED" -> "Disconnected"
                             "FAILED" -> "Failed"
                             "CLOSED", "ENDED" -> "Call Ended"
+                            "BUSY" -> "User is Busy"
+                            "REJECTED" -> "Call Declined"
+                            "MISSED" -> "Missed Call"
+                            "IDLE" -> if (callEnded) "Call Ended" else "Initializing..."
                             else -> "Initializing..."
                         },
                         color = Color.White,
