@@ -177,34 +177,26 @@ class WebRTCClient
             }
         }
 
-        override fun onIceCandidatesRemoved(p0: Array<out IceCandidate?>?) {
-
-        }
-
-        override fun onAddStream(p0: MediaStream?) {
-        }
-
-        override fun onRemoveStream(p0: MediaStream?) {
-        }
-
-        override fun onDataChannel(p0: DataChannel?) {
-        }
-
-        override fun onRenegotiationNeeded() {
-        }
-
-        override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
-        }
-
-        override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
-        }
+        override fun onIceCandidatesRemoved(p0: Array<out IceCandidate?>?) {}
+        override fun onAddStream(p0: MediaStream?) {}
+        override fun onRemoveStream(p0: MediaStream?) {}
+        override fun onDataChannel(p0: DataChannel?) {}
+        override fun onRenegotiationNeeded() {}
+        override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
+        override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {}
 
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-            Log.i("CALL", "[$userId] $newState")
+            Log.i("CALL", "[$userId] Connection state: $newState")
             when (newState) {
-                PeerConnection.PeerConnectionState.CONNECTED -> _connectionState.value = "CONNECTED"
+                PeerConnection.PeerConnectionState.CONNECTED -> {
+                    _connectionState.value = "CONNECTED"
+                    enableAllAudio()
+                }
                 PeerConnection.PeerConnectionState.CONNECTING -> _connectionState.value = "CONNECTING"
-                PeerConnection.PeerConnectionState.FAILED -> _connectionState.value = "FAILED"
+                PeerConnection.PeerConnectionState.FAILED -> {
+                    Log.e("CALL", "[$userId] PeerConnection FAILED")
+                    _connectionState.value = "FAILED"
+                }
                 PeerConnection.PeerConnectionState.DISCONNECTED -> _connectionState.value = "DISCONNECTED"
                 PeerConnection.PeerConnectionState.CLOSED -> {
                     if (!isClosingAllConnections) {
@@ -218,30 +210,43 @@ class WebRTCClient
             }
         }
 
-        override fun onIceConnectionReceivingChange(p0: Boolean) {
-        }
-
-        override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {
-        }
+        override fun onIceConnectionReceivingChange(p0: Boolean) {}
+        override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {}
 
         override fun onTrack(transceiver: RtpTransceiver?) {
-
             val track = transceiver?.receiver?.track()
             if (track is AudioTrack) {
                 track.setEnabled(true)
                 track.setVolume(10.0)
                 remoteAudioTracks[userId] = track
-                Log.d("CALL", "Remote audio track active for $userId")
+                Log.d("CALL", "Remote audio track received and enabled for $userId")
             }
-
             if (track is VideoTrack) {
-                Log.d("CALL", "Remote video track received")
+                Log.d("CALL", "Remote video track received for $userId")
                 _allTracks.value =
                     _allTracks.value.toMutableMap().apply {
                         put(userId, track)
                     }
             }
         }
+    }
+
+    fun enableAllAudio() {
+        localAudioTrack?.setEnabled(true)
+        remoteAudioTracks.forEach { (uid, track) ->
+            track.setEnabled(true)
+            track.setVolume(10.0)
+            Log.d("CALL", "Re-enabled remote audio for $uid")
+        }
+        refreshAudioRouting()
+    }
+
+    private fun refreshAudioRouting() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        if (audioManager.mode != AudioManager.MODE_IN_COMMUNICATION) {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        }
+        audioManager.isMicrophoneMute = false
     }
 
     fun startLocalVideo(): VideoTrack? {

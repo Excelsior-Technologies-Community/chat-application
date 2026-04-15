@@ -309,6 +309,10 @@ class CallViewModel @Inject constructor(
         webRTCClient.switchCamera()
     }
 
+    fun refreshAudio() {
+        webRTCClient.enableAllAudio()
+    }
+
     fun toggleMute() {
         val newState = !_isMuted.value
         _isMuted.value = newState
