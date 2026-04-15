@@ -116,7 +116,15 @@ class SignalingClient
                 handleCall(snapshot)
             }
 
-            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {
+                val removedId = snapshot.key ?: return
+                trySend(
+                    CallModel(
+                        callId = removedId,
+                        ended = true
+                    )
+                )
+            }
             override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onCancelled(error: DatabaseError) {
                 close(error.toException())

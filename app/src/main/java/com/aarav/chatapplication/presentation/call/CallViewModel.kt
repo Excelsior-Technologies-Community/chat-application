@@ -33,7 +33,7 @@ class CallViewModel @Inject constructor(
     private val handledOfferKeys = mutableSetOf<String>()
     private val handledAnswerKeys = mutableSetOf<String>()
 
-    private val connectedPeers = mutableSetOf<String>()
+    private val negotiatedPeers = mutableSetOf<String>()
 
     private var timerStarted = false
 
@@ -150,7 +150,7 @@ class CallViewModel @Inject constructor(
     private fun resetState() {
         handledOfferKeys.clear()
         handledAnswerKeys.clear()
-        connectedPeers.clear()
+        negotiatedPeers.clear()
         isAnswered = false
         isEnding = false
         timerStarted = false
@@ -161,8 +161,7 @@ class CallViewModel @Inject constructor(
     }
 
     private fun initiateOfferTo(callId: String, userId: String) {
-        if (connectedPeers.contains(userId)) return
-        connectedPeers.add(userId)
+        if (!negotiatedPeers.add(userId)) return
 
         webRTCClient.createPeerConnection(userId)
         webRTCClient.createOffer(userId) { sdp ->
@@ -187,7 +186,10 @@ class CallViewModel @Inject constructor(
         signalingJob = viewModelScope.launch {
             signalingClient.listenForCall(callId).collect { call ->
                 if (isEnding) return@collect
-                if (call == null) return@collect
+                if (call == null) {
+                    finishCall(callId, "ENDED")
+                    return@collect
+                }
 
                 if (activeCallerId.isEmpty()) activeCallerId = call.callerId
 
@@ -202,11 +204,17 @@ class CallViewModel @Inject constructor(
                     return@collect
                 }
 
+                val stalePeers = negotiatedPeers.filter { it !in call.participants }.toSet()
+                stalePeers.forEach { stalePeerId ->
+                    webRTCClient.removePeerConnection(stalePeerId)
+                    negotiatedPeers.remove(stalePeerId)
+                }
+
                 call.participants.forEach { peerId ->
                     if (peerId == myUserId) return@forEach
-                    if (connectedPeers.contains(peerId)) return@forEach
+                    if (negotiatedPeers.contains(peerId)) return@forEach
 
-                    val shouldIOffer = isCaller || myUserId < peerId
+                    val shouldIOffer = myUserId < peerId
                     if (shouldIOffer) {
                         initiateOfferTo(callId, peerId)
                     }
@@ -226,8 +234,8 @@ class CallViewModel @Inject constructor(
                     }
                     callStateManager.updateState("CONNECTING")
 
-                    if (!connectedPeers.contains(senderId)) {
-                        connectedPeers.add(senderId)
+                    if (!negotiatedPeers.contains(senderId)) {
+                        negotiatedPeers.add(senderId)
                         webRTCClient.createPeerConnection(senderId)
                     }
 
@@ -254,6 +262,8 @@ class CallViewModel @Inject constructor(
                         timeoutJob?.cancel()
                     }
                     callStateManager.updateState("CONNECTING")
+                    negotiatedPeers.add(senderId)
+                    webRTCClient.createPeerConnection(senderId)
                     webRTCClient.onAnswerReceived(senderId, answer)
                 }
             }
@@ -343,7 +353,9 @@ class CallViewModel @Inject constructor(
             timerJob = null
 
             delay(1000)
-            signalingClient.cleanupCallData(callId)
+            if (isCaller) {
+                signalingClient.cleanupCallData(callId)
+            }
             activeCallId = null
             callStateManager.updateState("IDLE")
             isEnding = false
@@ -380,7 +392,9 @@ class CallViewModel @Inject constructor(
             timeoutJob = null
 
             delay(1000)
-            signalingClient.cleanupCallData(callId)
+            if (isCaller) {
+                signalingClient.cleanupCallData(callId)
+            }
             activeCallId = null
             callStateManager.updateState("IDLE")
             isEnding = false
