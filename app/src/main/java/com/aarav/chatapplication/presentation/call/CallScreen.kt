@@ -135,7 +135,7 @@ fun CallScreen(
     LaunchedEffect(callId) {
 
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = true
+        audioManager.isSpeakerphoneOn = isSpeakerOn
         audioManager.isMicrophoneMute = false
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -151,20 +151,24 @@ fun CallScreen(
         if(!isCaller) {
             viewModel.receiveCall(callId, myUserId)
         }
+    }
 
-//        if (isCaller) {
-//            viewModel.startCall(
-//                CallModel(
-//                    callId = callId,
-//                    callerId = callerId,
-//                    receiverId = ,
-//                    callerName = callerName
-//                ),
-//                callerId
-//            )
-//        } else {
-//            viewModel.receiveCall(callId, receiverId)
-//        }
+    LaunchedEffect(state, isSpeakerOn, isMuted) {
+        if (state == "CONNECTED" || state == "CONNECTING" || state == "CALLING" || state == "RECEIVING") {
+            // force communication mode
+            if (audioManager.mode != AudioManager.MODE_IN_COMMUNICATION) {
+                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            }
+
+            // re-apply speakerphone setting toggling mic often causes Android to revert to earpiece
+            if (audioManager.isSpeakerphoneOn != isSpeakerOn) {
+                audioManager.isSpeakerphoneOn = isSpeakerOn
+            }
+
+            if (audioManager.isMicrophoneMute) {
+                audioManager.isMicrophoneMute = false
+            }
+        }
     }
 
 //    LaunchedEffect(Unit) {

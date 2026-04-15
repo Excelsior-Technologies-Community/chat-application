@@ -273,7 +273,7 @@ fun HomeScreen(
                     Surface(
                         shape = RoundedCornerShape(28.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
                     ) {
                         Text(
                             "Recents",
@@ -325,7 +325,7 @@ fun DirectChatItem(
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .clickable {
                 onClick()
             },
@@ -447,7 +447,7 @@ fun GroupChatItem(
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .clickable {
                 onClick()
             },

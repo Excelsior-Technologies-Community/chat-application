@@ -6,7 +6,7 @@ data class CallModel(
     val callerName: String? = null,
     val receiverId: String = "",
     val participants: List<String> = emptyList(),
-    val offers: Map<String, String> = emptyMap(),
+    val offers: Map<String, OfferModel> = emptyMap(),
     val answers: Map<String, String> = emptyMap(),
     val ended: Boolean = false,
     val isBusy: Boolean = false,
@@ -33,3 +33,7 @@ data class CallHistoryModel(
     val status: String = ""
 )
 
+data class OfferModel(
+    val sdp: String = "",
+    val senderId: String = ""
+)

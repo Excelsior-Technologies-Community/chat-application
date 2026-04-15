@@ -35,9 +35,6 @@ class WebRTCClient
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnections = mutableMapOf<String, PeerConnection>()
 
-    @Volatile
-    private var isClosed = false
-
     private val _iceCandidateFlow = MutableSharedFlow<Pair<IceCandidate, String>>(
         replay = 10
     )
@@ -58,7 +55,6 @@ class WebRTCClient
     private lateinit var eglBase: EglBase
     private val _eglContext = MutableStateFlow<EglBase.Context?>(null)
     val eglContext = _eglContext.asStateFlow()
-    private var remoteVideoTrack: VideoTrack? = null
 
 
     fun init() {
@@ -66,7 +62,6 @@ class WebRTCClient
         if (peerConnectionFactory != null) return
 
 
-//        isClosed = false
         _connectionState.value = "NEW"
 
 
@@ -95,24 +90,6 @@ class WebRTCClient
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
             .createPeerConnectionFactory()
 
-//        val iceServers = listOf(
-//
-//            // STUN
-//            PeerConnection.IceServer.builder("stun:stun.l.google.com:19302")
-//                .createIceServer(),
-//
-//            // TURN
-//            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
-//                .setUsername("openrelayproject")
-//                .setPassword("openrelayproject")
-//                .createIceServer()
-//        )
-
-//        peerConnection = peerConnectionFactory?.createPeerConnection(
-//            iceServers,
-//            peerConnectionObserver
-//        )
-
         val factory = peerConnectionFactory ?: return
 
         val constraints = MediaConstraints().apply {
@@ -125,20 +102,10 @@ class WebRTCClient
         val audioSource = factory.createAudioSource(constraints)
         localAudioTrack = factory.createAudioTrack("audioTrack", audioSource)
 
-
-        //startLocalVideo()
-//
-//        val streamIds = listOf("ARDAMS")
-//        pc.addTrack(localAudioTrack, streamIds)
-//        localVideoTrack?.let {
-//            pc.addTrack(it, streamIds)
-//        }
-
     }
 
     fun createPeerConnection(userId: String) {
 
-//        if (isClosed) return
 
         val factory = peerConnectionFactory ?: return
 
@@ -151,11 +118,9 @@ class WebRTCClient
 
 
         val iceServers = listOf(
-
             // STUN
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302")
                 .createIceServer(),
-
             // TURN
             PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
                 .setUsername("openrelayproject")
@@ -181,7 +146,6 @@ class WebRTCClient
 
     private fun createObserver(userId: String) = object : PeerConnection.Observer {
         override fun onIceCandidate(candidate: IceCandidate?) {
-//            if (isClosed) return
             candidate?.let {
                 _iceCandidateFlow.tryEmit(it to userId)
             }
@@ -210,12 +174,10 @@ class WebRTCClient
         }
 
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-//            if (!isClosed) {
             Log.i("CALL", "[$userId] $newState")
             if (newState == PeerConnection.PeerConnectionState.CONNECTED) {
                 _connectionState.value = "CONNECTED"
             }
-//            }
         }
 
         override fun onIceConnectionReceivingChange(p0: Boolean) {
@@ -226,7 +188,6 @@ class WebRTCClient
 
         override fun onTrack(transceiver: RtpTransceiver?) {
 
-//            if (!isClosed) {
             val track = transceiver?.receiver?.track()
             if (track is AudioTrack) {
                 track.setEnabled(true)
@@ -243,11 +204,7 @@ class WebRTCClient
                     }
             }
         }
-//        }
     }
-
-
-    fun getEglContext() = eglBase.eglBaseContext
 
     fun startLocalVideo(): VideoTrack? {
         val peerConnectionFactory = peerConnectionFactory ?: return null
@@ -306,60 +263,6 @@ class WebRTCClient
         }
     }
 
-//    private val peerConnectionObserver = object : PeerConnection.Observer {
-//        override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
-//
-//        override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
-//
-//        }
-//
-//
-//        override fun onIceConnectionReceivingChange(p0: Boolean) {}
-//
-//        override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {}
-//
-//        override fun onIceCandidate(candidate: IceCandidate?) {
-//            if (isClosed) return
-//            candidate?.let {
-//                _iceCandidateFlow.tryEmit(it)
-//            }
-//        }
-//
-//        override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-//
-//            if (!isClosed) {
-//                Log.i("CALL", "onConnectionChange: " + newState?.name)
-//                _connectionState.value = newState?.name ?: "UNKNOWN"
-//            }
-//        }
-//
-//        override fun onTrack(transceiver: RtpTransceiver?) {
-//
-//            if (!isClosed) {
-//                val track = transceiver?.receiver?.track()
-//                if (track is AudioTrack) {
-//                    track.setEnabled(true)
-//                }
-//
-//                if (track is VideoTrack) {
-//                    Log.d("CALL", "Remote video track received")
-//                    remoteVideoTrack = track
-//                    _allTracks.tryEmit(track)
-//                }
-//            }
-//        }
-//
-//        override fun onIceCandidatesRemoved(p0: Array<out IceCandidate?>?) {}
-//
-//        override fun onAddStream(p0: MediaStream?) {}
-//
-//        override fun onRemoveStream(p0: MediaStream?) {}
-//
-//        override fun onDataChannel(p0: DataChannel?) {}
-//
-//        override fun onRenegotiationNeeded() {}
-//
-//    }
 
     fun toggleMute(isMuted: Boolean) {
         Log.d("CALL", "MUTE: $isMuted")
@@ -368,7 +271,6 @@ class WebRTCClient
 
     fun createOffer(userId: String, onOfferCreated: (SessionDescription) -> Unit) {
 
-//        if (isClosed) return
         if (!peerConnections.containsKey(userId)) {
             createPeerConnection(userId)
         }
@@ -379,7 +281,6 @@ class WebRTCClient
 
         pc.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription) {
-//                if (isClosed) return
                 pc.setLocalDescription(this, sdp)
                 onOfferCreated(sdp)
             }
@@ -395,7 +296,6 @@ class WebRTCClient
 
     fun createAnswer(userId: String, onAnswerCreated: (SessionDescription) -> Unit) {
 
-//        if (isClosed) return
         if (!peerConnections.containsKey(userId)) {
             createPeerConnection(userId)
         }
@@ -404,7 +304,6 @@ class WebRTCClient
 
         pc.createAnswer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription) {
-//                if (isClosed) return
                 pc.setLocalDescription(this, sdp)
                 onAnswerCreated(sdp)
             }
@@ -423,7 +322,6 @@ class WebRTCClient
         offer: String,
         onAnswerCreated: (SessionDescription) -> Unit
     ) {
-//        if (isClosed) return
         if (!peerConnections.containsKey(userId)) {
             createPeerConnection(userId)
         }
@@ -450,7 +348,6 @@ class WebRTCClient
     }
 
     fun onAnswerReceived(userId: String, answer: String) {
-//        if (isClosed) return
         if (!peerConnections.containsKey(userId)) {
             createPeerConnection(userId)
         }
@@ -475,7 +372,6 @@ class WebRTCClient
     }
 
     fun addIceCandidate(userId: String, candidate: IceCandidateModel) {
-//        if (isClosed) return
         if (!peerConnections.containsKey(userId)) {
             createPeerConnection(userId)
         }
@@ -491,19 +387,14 @@ class WebRTCClient
 
         pc.addIceCandidate(ice)
 
-
-//        if (pc.remoteDescription != null) {
-//        }
     }
 
     fun closeConnection() {
-//        if (isClosed) return
-//
-//        isClosed = true
 
         try {
             // stop camera
             videoCapturer?.stopCapture()
+
 //            videoCapturer?.dispose()
 //            videoCapturer = null
 

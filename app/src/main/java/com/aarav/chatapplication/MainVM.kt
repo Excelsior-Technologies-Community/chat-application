@@ -34,20 +34,28 @@ class MainVM
             signalingClient.listenForIncomingCalls(userId)
                 .collect { call ->
 
-                    val myOffer = call.offers[userId]
-                    val myAnswer = call.answers[userId]
-
                     if (call.ended) {
                         _incomingCall.value = null
                         return@collect
                     }
 
+                    val myOffer = call.offers.get(userId)
+                    val myAnswer = call.answers.get(userId)
+
                     if (myOffer != null && myAnswer == null) {
-                        if (callStateManager.callState.value != "IDLE" && call.callId != callStateManager.activeCallId) {
+
+                        val isBusy =
+                            callStateManager.callState.value != "IDLE" &&
+                                    call.callId != callStateManager.activeCallId
+
+                        if (isBusy) {
                             signalingClient.setBusy(call.callId)
                         } else {
                             _incomingCall.value = call
                         }
+
+                    } else {
+                        _incomingCall.value = null
                     }
                 }
         }

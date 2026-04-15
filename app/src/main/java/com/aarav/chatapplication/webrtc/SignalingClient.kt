@@ -3,6 +3,7 @@ package com.aarav.chatapplication.webrtc
 import com.aarav.chatapplication.data.model.CallHistoryModel
 import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
+import com.aarav.chatapplication.data.model.OfferModel
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -30,7 +31,7 @@ class SignalingClient
     suspend fun sendOffer(
         callId: String,
         receiverId: String,
-        offer: String
+        offer: OfferModel
     ) {
         callRef
             .child(callId)

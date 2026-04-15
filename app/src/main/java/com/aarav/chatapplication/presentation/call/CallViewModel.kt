@@ -3,12 +3,12 @@ package com.aarav.chatapplication.presentation.call
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.CallHistoryModel
+import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
-import com.aarav.chatapplication.domain.repository.UserRepository
-import com.aarav.chatapplication.webrtc.SignalingClient
+import com.aarav.chatapplication.data.model.OfferModel
 import com.aarav.chatapplication.webrtc.CallStateManager
+import com.aarav.chatapplication.webrtc.SignalingClient
 import com.aarav.chatapplication.webrtc.WebRTCClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import org.webrtc.EglBase
 import org.webrtc.VideoTrack
 import javax.inject.Inject
 
@@ -26,12 +25,10 @@ import javax.inject.Inject
 class CallViewModel @Inject constructor(
     private val signalingClient: SignalingClient,
     private val webRTCClient: WebRTCClient,
-    private val userRepository: UserRepository,
     private val callStateManager: CallStateManager
 ) : ViewModel() {
 
     private var isCaller = false
-    private var callerName = ""
 
     private val connectedUsers = mutableSetOf<String>()
     private val answeredUsers = mutableSetOf<String>()
@@ -105,9 +102,6 @@ class CallViewModel @Inject constructor(
         }
     }
 
-//    fun getEglContext(): EglBase.Context {
-//        return webRTCClient.getEglContext()
-//    }
 
     fun startCall(call: CallModel, myUserId: String) {
         this.myUserId = myUserId
@@ -116,7 +110,7 @@ class CallViewModel @Inject constructor(
         handledOffers.clear()
         handledAnswers.clear()
         answeredUsers.clear()
-        //connectedUsers.clear()
+        connectedUsers.clear()
 
         activeCallId = call.callId
         callStateManager.activeCallId = call.callId
@@ -146,16 +140,23 @@ class CallViewModel @Inject constructor(
 
             otherUsers.forEach { userId ->
 
-                webRTCClient.createPeerConnection(userId)
+                    webRTCClient.createPeerConnection(userId)
 
-                webRTCClient.createOffer(userId) { sdp ->
-                    viewModelScope.launch {
-                        if (!isEnding) {
-                            signalingClient.sendOffer(call.callId, userId, sdp.description)
+                    webRTCClient.createOffer(userId) { sdp ->
+                        viewModelScope.launch {
+                            if (!isEnding) {
+                                signalingClient.sendOffer(
+                                    call.callId,
+                                    userId,
+                                    OfferModel(
+                                        sdp.description,
+                                        myUserId
+                                    )
+                                )
+                            }
                         }
                     }
                 }
-            }
 
             startObservers(call.callId)
         }
@@ -180,7 +181,7 @@ class CallViewModel @Inject constructor(
         handledOffers.clear()
         handledAnswers.clear()
         answeredUsers.clear()
-//        connectedUsers.clear()
+        connectedUsers.clear()
 
         activeCallId = callId
         callStateManager.activeCallId = callId
@@ -203,17 +204,12 @@ class CallViewModel @Inject constructor(
         }
     }
 
-    fun getLocalVideoTrack(): VideoTrack? {
-        return webRTCClient.localVideoTrack
-    }
-
     fun toggleCamera() {
         webRTCClient.switchCamera()
     }
 
     private fun startObservers(callId: String) {
 
-        //connectionJob?.cancel()
         signalingJob?.cancel()
         iceOutgoingJob?.cancel()
         iceIncomingJob?.cancel()
@@ -241,32 +237,40 @@ class CallViewModel @Inject constructor(
                     }
 
 
-                    val myOffer = call?.offers?.get(myUserId)
+                    //val myOffer = call?.offers?.get(myUserId)
 
-                    if (!isCaller && myOffer != null && !handledOffers.contains(call.callerId)) {
+                    call?.offers.orEmpty().forEach { (receiverId, offer) ->
 
-                        handledOffers.add(call.callerId)
+                        if (receiverId != myUserId) return@forEach
 
-                        if (!isAnswered) {
-                            isAnswered = true
-                            timeoutJob?.cancel()
-                        }
+                        val senderId = offer.senderId
 
-                        callStateManager.updateState("CONNECTING")
+                        if (!handledOffers.contains(senderId)) {
 
-                        val callerId = call.callerId
+                            handledOffers.add(senderId)
+                            connectedUsers.add(senderId)
 
-                        webRTCClient.createPeerConnection(callerId)
+                            if (!isAnswered) {
+                                isAnswered = true
+                                timeoutJob?.cancel()
+                            }
 
-                        webRTCClient.onRemoteOfferReceived(callerId, myOffer) { answer ->
+                            callStateManager.updateState("CONNECTING")
+//
+//                            val senderId = call?.callerId
 
-                            viewModelScope.launch {
-                                if (!isEnding) {
-                                    signalingClient.sendAnswer(
-                                        callId,
-                                        myUserId,
-                                        answer.description
-                                    )
+                            webRTCClient.createPeerConnection(senderId)
+
+                            webRTCClient.onRemoteOfferReceived(senderId, offer.sdp) { answer ->
+
+                                viewModelScope.launch {
+                                    if (!isEnding) {
+                                        signalingClient.sendAnswer(
+                                            callId,
+                                            myUserId,
+                                            answer.description
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -274,10 +278,13 @@ class CallViewModel @Inject constructor(
 
                     call?.answers.orEmpty().forEach { (userId, answer) ->
 
-                        if (!handledAnswers.contains(userId) && userId != myUserId) {
+                        if (userId == myUserId) return@forEach
+
+                        if (!handledAnswers.contains(userId)) {
 
                             handledAnswers.add(userId)
                             answeredUsers.add(userId)
+                            connectedUsers.add(userId)
 
                             if (!isAnswered) {
                                 isAnswered = true
@@ -318,6 +325,38 @@ class CallViewModel @Inject constructor(
         }
     }
 
+    fun handleParticipantsChanged(newParticipants: List<String>) {
+        val myId = myUserId
+        val others = newParticipants.filter { it != myId }
+
+        others.forEach { userId ->
+            if (!connectedUsers.contains(userId)) {
+                connectedUsers.add(userId)
+
+                webRTCClient.createPeerConnection(userId)
+
+                // Handshake Initiative:
+                // 1. Primary caller always offers to everyone.
+                // 2. Non-primary users use ID comparison to ensure only one offer is made between any pair.
+                if (isCaller || myUserId < userId) {
+                    webRTCClient.createOffer(userId) { offer ->
+                        viewModelScope.launch {
+                            activeCallId?.let {
+                                signalingClient.sendOffer(
+                                    it, userId,
+                                    OfferModel(
+                                        offer.description,
+                                        myUserId
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun startTimer() {
         if (timerStarted) return
         timerStarted = true
@@ -349,7 +388,14 @@ class CallViewModel @Inject constructor(
                 signalingClient.endCall(callId)
                 webRTCClient.closeConnection()
 
-                callStateManager.updateState(if (currentStatus in listOf("MISSED", "BUSY", "REJECTED")) currentStatus else "ENDED")
+                callStateManager.updateState(
+                    if (currentStatus in listOf(
+                            "MISSED",
+                            "BUSY",
+                            "REJECTED"
+                        )
+                    ) currentStatus else "ENDED"
+                )
                 _callEnded.value = true
 
             } catch (e: Exception) {
@@ -403,7 +449,7 @@ class CallViewModel @Inject constructor(
             webRTCClient.closeConnection()
             _events.trySend(UiEvent.EndCall)
 
-           // _localVideoTrack.value = null
+            // _localVideoTrack.value = null
             _callEnded.value = true
 
 //        connectionJob?.cancel()
@@ -440,14 +486,6 @@ class CallViewModel @Inject constructor(
         webRTCClient.toggleMute(newState)
     }
 
-    fun getUserInfo(userId: String) {
-        viewModelScope.launch {
-            userRepository.findUserByUserId(userId).collect {
-                callerName = it.name ?: "Test"
-            }
-        }
-    }
-
     private fun saveHistoryIfNeeded(finalStatus: String) {
         if (!isCaller) return
         if (activeCallerId.isEmpty() || activeReceiverId.isEmpty()) return
@@ -458,7 +496,7 @@ class CallViewModel @Inject constructor(
             duration = _callTime.value.toLong(),
             status = finalStatus
         )
-        
+
         viewModelScope.launch {
             try {
                 signalingClient.saveCallHistory(history)
