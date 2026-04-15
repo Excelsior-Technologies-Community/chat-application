@@ -90,42 +90,37 @@ class SignalingClient
 
     fun listenForIncomingCalls(userId: String): Flow<CallModel> = callbackFlow {
 
-//        val ref = callRef.orderByChild("receiverId").equalTo(userId)
+        val listener = object : ChildEventListener {
 
-        val listener = object : ValueEventListener {
-
-            override fun onDataChange(snapshot: DataSnapshot) {
-
-                snapshot.children.forEach { child ->
-
-                    try {
-                        val call = child.getValue(CallModel::class.java)
-
-                        if (
-                            call != null &&
-                            call.participants.contains(userId) &&
-                            call.callerId != userId
-                        ) {
-                            trySend(call)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("SIGNALING", "Skipping invalid call data at ${child.key}", e)
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                try {
+                    val call = snapshot.getValue(CallModel::class.java)
+                    if (
+                        call != null &&
+                        call.participants.contains(userId) &&
+                        call.callerId != userId &&
+                        !call.ended
+                    ) {
+                        Log.d("SIGNALING", "Incoming call detected: ${call.callId}")
+                        trySend(call)
                     }
-
-                    /*
-                      call.offer != null &&
-                      call.answer == null
-                        && !call.ended
-                     */
+                } catch (e: Exception) {
+                    Log.e("SIGNALING", "Skipping invalid call data at ${snapshot.key}", e)
                 }
             }
 
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                // We only care about new calls, not updates to existing ones here.
+            }
+
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onCancelled(error: DatabaseError) {
                 close(error.toException())
             }
         }
 
-        callRef.addValueEventListener(listener)
+        callRef.addChildEventListener(listener)
 
         awaitClose {
             callRef.removeEventListener(listener)
