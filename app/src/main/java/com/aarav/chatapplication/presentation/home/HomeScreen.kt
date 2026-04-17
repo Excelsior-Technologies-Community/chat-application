@@ -69,7 +69,6 @@ fun HomeScreen(
     navigateToChat: (String, String, String) -> Unit,
     navigateToGroupChat: (String, String, String) -> Unit,
     navigateToCreateGroup: (String) -> Unit,
-    navigateToCall: (String, String, String, String, Boolean) -> Unit,
     onLogout: () -> Unit,
     homeScreenVM: HomeScreenVM
 ) {

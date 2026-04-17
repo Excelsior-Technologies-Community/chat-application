@@ -86,6 +86,10 @@ class CallViewModel @Inject constructor(
     private var timerJob: Job? = null
     private var timeoutJob: Job? = null
 
+
+    private val _isVideoEnabled = MutableStateFlow(false)
+    val isVideoEnabled = _isVideoEnabled.asStateFlow()
+
     init {
 
         webRTCClient.onPeerConnected = { userId ->
@@ -93,7 +97,6 @@ class CallViewModel @Inject constructor(
 
             isProcessing = false
 
-            peerCreated.remove(userId)
 
             viewModelScope.launch {
                 delay(300)
@@ -136,7 +139,12 @@ class CallViewModel @Inject constructor(
 
         viewModelScope.launch {
             webRTCClient.init()
-            webRTCClient.startLocalVideo()
+
+            if(call.videoCall) {
+                webRTCClient.startLocalVideo()
+                _isVideoEnabled.value = true
+            }
+
             //_localVideoTrack.value = webRTCClient.localVideoTrack
 
             signalingClient.createCall(call)
@@ -148,7 +156,6 @@ class CallViewModel @Inject constructor(
             startObservers(call.callId)
         }
 
-        timeoutJob?.cancel()
         timeoutJob = viewModelScope.launch {
             delay(30_000)
             if (!isAnswered && !isEnding) {
@@ -158,7 +165,7 @@ class CallViewModel @Inject constructor(
         }
     }
 
-    fun receiveCall(callId: String, myUserId: String) {
+    fun receiveCall(callId: String, myUserId: String, isVideoCall: Boolean) {
         this.myUserId = myUserId
         isCaller = false
         resetState()
@@ -173,7 +180,13 @@ class CallViewModel @Inject constructor(
 
         viewModelScope.launch {
             webRTCClient.init()
-            webRTCClient.startLocalVideo()
+
+
+            if(isVideoCall) {
+                webRTCClient.startLocalVideo()
+                _isVideoEnabled.value = true
+            }
+
             //_localVideoTrack.value = webRTCClient.localVideoTrack
             startObservers(callId)
         }
@@ -192,6 +205,7 @@ class CallViewModel @Inject constructor(
         _isMuted.value = false
         _callEnded.value = false
         timerJob?.cancel()
+        timeoutJob?.cancel()
     }
 
     private fun ensurePeerConnection(userId: String) {
@@ -202,7 +216,7 @@ class CallViewModel @Inject constructor(
     }
 
     private fun enqueue(userId: String) {
-        if (connectionQueue.contains(userId)) return
+        if (connectionQueue.contains(userId) || peerCreated.contains(userId)) return
 
         Log.d(TAG, "[$myUserId] Queue add: $userId")
         connectionQueue.add(userId)
@@ -365,6 +379,23 @@ class CallViewModel @Inject constructor(
         webRTCClient.switchCamera()
     }
 
+    fun toggleVideo() {
+        val newState = !_isVideoEnabled.value
+        _isVideoEnabled.value = newState
+
+        if (newState) {
+            webRTCClient.enableVideo()
+        } else {
+            webRTCClient.disableVideo()
+        }
+    }
+
+//        activeCallId?.let { id ->
+//            viewModelScope.launch {
+//                signalingClient.updateRemoteVideoState(id, isCaller, newState)
+//            }
+//        }
+
     fun refreshAudio() {
         webRTCClient.enableAllAudio()
     }
@@ -396,20 +427,13 @@ class CallViewModel @Inject constructor(
                 callStateManager.updateState(
                     if (currentStatus in listOf("MISSED", "BUSY", "REJECTED")) currentStatus else "ENDED"
                 )
-                _callEnded.value = true
             } catch (e: Exception) {
                 Log.e(TAG, "Error ending call", e)
             }
 
             _events.trySend(UiEvent.EndCall)
             _callEnded.value = true
-
-            signalingJob?.cancel(); signalingJob = null
-            iceOutgoingJob?.cancel(); iceOutgoingJob = null
-            iceIncomingJob?.cancel(); iceIncomingJob = null
-            timerJob?.cancel(); timerJob = null
-
-            delay(1000)
+            cleanupJobs()
             signalingClient.cleanupCallData(callId)
             activeCallId = null
             callStateManager.updateState("IDLE")
@@ -434,14 +458,7 @@ class CallViewModel @Inject constructor(
             webRTCClient.closeConnection()
             _events.trySend(UiEvent.EndCall)
             _callEnded.value = true
-
-            signalingJob?.cancel(); signalingJob = null
-            iceOutgoingJob?.cancel(); iceOutgoingJob = null
-            iceIncomingJob?.cancel(); iceIncomingJob = null
-            timerJob?.cancel(); timerJob = null
-            timeoutJob?.cancel(); timeoutJob = null
-
-            delay(1000)
+            cleanupJobs()
             signalingClient.cleanupCallData(callId)
             activeCallId = null
             callStateManager.updateState("IDLE")
@@ -466,6 +483,23 @@ class CallViewModel @Inject constructor(
                 Log.e(TAG, "Failed to save history", e)
             }
         }
+    }
+
+    private fun cleanupJobs() {
+        signalingJob?.cancel()
+        signalingJob = null
+
+        iceOutgoingJob?.cancel()
+        iceOutgoingJob = null
+
+        iceIncomingJob?.cancel()
+        iceIncomingJob = null
+
+        timerJob?.cancel()
+        timerJob = null
+
+        timeoutJob?.cancel()
+        timeoutJob = null
     }
 
     override fun onCleared() {

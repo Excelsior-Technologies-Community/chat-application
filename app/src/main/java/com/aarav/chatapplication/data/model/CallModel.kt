@@ -8,17 +8,15 @@ data class CallModel(
     val callerId: String = "",
     val callerName: String? = null,
     val receiverId: String = "",
+    val groupCall: Boolean = false,
+    val videoCall: Boolean = false,
     val participants: List<String> = emptyList(),
     val offers: Map<String, OfferModel> = emptyMap(),
     val answers: Map<String, String> = emptyMap(),
     val ended: Boolean = false,
     val isBusy: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
-) {
-    fun isGroupCall(): Boolean {
-        return participants.size > 2
-    }
-}
+)
 
 data class IceCandidateModel(
     val sdp: String = "",

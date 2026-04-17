@@ -67,7 +67,7 @@ fun GroupChatScreen(
     myId: String,
     senderName: String,
     back: () -> Unit,
-    onCallStart: () -> Unit,
+    onCallStart: (Boolean) -> Unit,
     viewModel: GroupChatViewModel,
     callViewModel: CallViewModel
 ) {
@@ -97,6 +97,7 @@ fun GroupChatScreen(
             listState.animateScrollToItem(uiState.messages.lastIndex)
         }
     }
+
 
     MyAlertDialog(
         shouldShowDialog = uiState.showErrorDialog,
@@ -207,7 +208,6 @@ fun GroupChatScreen(
 
                         IconButton(
                             onClick = {
-//                                navigateToCall()
 
                                 val members = uiState.group?.members
                                 val participantList = members?.keys?.toList()
@@ -219,6 +219,8 @@ fun GroupChatScreen(
                                             callerId = myId,
                                             callerName = senderName,
                                             participants = it,
+                                            videoCall = true,
+                                            groupCall = true,
                                         )
 
                                         callViewModel.startCall(
@@ -228,7 +230,44 @@ fun GroupChatScreen(
 
                                         delay(300)
 
-                                        onCallStart()
+                                        onCallStart(true)
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.camera_on),
+                                contentDescription = "video call",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+
+                                val members = uiState.group?.members
+                                val participantList = members?.keys?.toList()
+
+                                scope.launch {
+                                    participantList?.let {
+                                        val call = CallModel(
+                                            callId = groupId,
+                                            callerId = myId,
+                                            callerName = senderName,
+                                            participants = it,
+                                            videoCall = false,
+                                            groupCall = true,
+                                        )
+
+                                        callViewModel.startCall(
+                                            call,
+                                            myId
+                                        )
+
+                                        delay(300)
+
+                                        onCallStart(false)
                                     }
                                 }
                             },
@@ -236,7 +275,7 @@ fun GroupChatScreen(
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.phone),
-                                contentDescription = "call",
+                                contentDescription = "audio call",
                                 modifier = Modifier.size(24.dp)
                             )
                         }

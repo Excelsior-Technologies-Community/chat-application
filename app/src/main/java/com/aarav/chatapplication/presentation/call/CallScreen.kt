@@ -59,12 +59,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.aarav.chatapplication.R
-import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.utils.formatTime
 import kotlinx.coroutines.delay
 import org.webrtc.EglBase
@@ -79,6 +77,8 @@ fun CallScreen(
     myUserId: String,
     callerName: String,
     isCaller: Boolean,
+    isGroupCall: Boolean,
+    isVideoCall: Boolean,
     onCallEnd: () -> Unit,
     viewModel: CallViewModel
 ) {
@@ -115,6 +115,9 @@ fun CallScreen(
     val time by viewModel.callTime.collectAsState()
 
 
+    val isVideoEnabled by viewModel.isVideoEnabled.collectAsState()
+
+
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     val focusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -147,8 +150,8 @@ fun CallScreen(
             )
         }
 
-        if(!isCaller) {
-            viewModel.receiveCall(callId, myUserId)
+        if (!isCaller) {
+            viewModel.receiveCall(callId, myUserId, isVideoCall)
         }
     }
 
@@ -245,12 +248,14 @@ fun CallScreen(
                 audioManager.isSpeakerphoneOn = false
                 audioManager.isMicrophoneMute = false
 
-                delay(1000)
+                delay(1500)
 
                 onCallEnd()
             }
         }
     }
+
+
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -264,9 +269,11 @@ fun CallScreen(
         ) {
 //            val myUserId = if (isCaller) callerId else receiverId
 
+
             if (eglBaseContext != null) {
                 VideoGrid(
                     tracks,
+                    isVideoEnabled,
                     myUserId,
                     context,
                     eglBaseContext!!
@@ -349,6 +356,8 @@ fun CallScreen(
                     .padding(bottom = 54.dp),
                 isMicEnabled = !isMuted,
                 isSpeakerOn = isSpeakerOn,
+                isVideoEnabled = isVideoEnabled,
+                isVideoCall = isVideoCall,
                 onMicClick = { viewModel.toggleMute() },
                 onSpeakerClick = {
                     isSpeakerOn = !isSpeakerOn
@@ -356,6 +365,9 @@ fun CallScreen(
                 },
                 onEndCallClick = {
                     viewModel.endCall(callId)
+                },
+                toggleVideo = {
+                    viewModel.toggleVideo()
                 },
                 toggleCamera = {
                     viewModel.toggleCamera()
@@ -385,15 +397,17 @@ fun CallScreen(
     }
 }
 
-@Preview(showBackground = true)
 @Composable
 fun CallActionToolbar(
     modifier: Modifier = Modifier,
     isMicEnabled: Boolean,
     isSpeakerOn: Boolean,
+    isVideoEnabled: Boolean,
+    isVideoCall: Boolean,
     onMicClick: () -> Unit,
     onSpeakerClick: () -> Unit,
     onEndCallClick: () -> Unit,
+    toggleVideo: () -> Unit,
     toggleCamera: () -> Unit
 ) {
 
@@ -423,6 +437,23 @@ fun CallActionToolbar(
                 painter = painterResource(R.drawable.flip_camera),
                 contentDescription = "Switch Camera"
             )
+        }
+
+
+        if (isVideoCall) {
+            IconButton(
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = if (isVideoEnabled) enabledContainer else disabledContainer,
+                    contentColor = contentColor
+                ),
+                onClick = toggleVideo,
+            ) {
+                Icon(
+                    painter = painterResource(if (isVideoEnabled) R.drawable.camera_on else R.drawable.camera_off),
+                    contentDescription = "video toggle",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         IconButton(
@@ -616,6 +647,7 @@ fun IncomingCallBanner(
 @Composable
 fun VideoGrid(
     tracks: Map<String, VideoTrack>,
+    isLocalVideoEnabled: Boolean,
     myUserId: String,
     context: Context,
     eglBaseContext: EglBase.Context
@@ -634,6 +666,7 @@ fun VideoGrid(
         1 -> {
             VideoItem(
                 users[0].value,
+                isLocalVideoEnabled,
                 users[0].key,
                 myUserId,
                 context,
@@ -647,6 +680,7 @@ fun VideoGrid(
                 users.forEach {
                     VideoItem(
                         it.value,
+                        isLocalVideoEnabled,
                         it.key,
                         myUserId,
                         context,
@@ -665,6 +699,7 @@ fun VideoGrid(
                 items(users) {
                     VideoItem(
                         it.value,
+                        isLocalVideoEnabled,
                         it.key,
                         myUserId,
                         context,
@@ -681,6 +716,7 @@ fun VideoGrid(
 @Composable
 fun VideoItem(
     track: VideoTrack,
+    isLocalVideoEnabled: Boolean,
     userId: String,
     myUserId: String,
     context: Context,
@@ -689,41 +725,76 @@ fun VideoItem(
 ) {
 
 
-   // val isLocal = userId == myUserId
+    // val isLocal = userId == myUserId
     val isLocal = userId == myUserId || userId == "LOCAL"
 
     val view = remember(eglBaseContext) {
         SurfaceViewRenderer(context)
     }
 
-    DisposableEffect(true) {
+
+
+
+
+    DisposableEffect(eglBaseContext) {
+
+        view.init(eglBaseContext, null)
+        view.setMirror(isLocal)
+        view.setZOrderMediaOverlay(true)
+        view.setEnableHardwareScaler(true)
+
+        view.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+
         onDispose {
             track.removeSink(view)
             view.release()
         }
+
     }
 
     Box(
         modifier = modifier.fillMaxSize()
     ) {
-        AndroidView(
-            modifier = modifier.fillMaxSize(),
-            factory = {
-                view.apply {
-                    init(eglBaseContext, null)
-                    setMirror(isLocal)
-                    setZOrderMediaOverlay(true)
-                    setEnableHardwareScaler(true)
-
-                    setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+        if (isLocal && !isLocalVideoEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        painter = painterResource(R.drawable.camera_off),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "You",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
                 }
-            },
-            update = {
-                Log.d("VIDEO", "Rendering track for $userId")
-                track.setEnabled(true)
-                track.addSink(view)
             }
-        )
+        } else {
+            AndroidView(
+                modifier = modifier.fillMaxSize(),
+                factory = {
+                    view
+                },
+                update = {
+                    try {
+                        Log.d("VIDEO", "Rendering track for $userId")
+                        track.setEnabled(true)
+                        track.addSink(view)
+                    } catch (e: Exception) {
+                        Log.e("VIDEO", "Track already disposed for $userId")
+                    }
+                }
+            )
+        }
 
 
         Text(

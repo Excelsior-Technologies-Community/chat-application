@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,8 @@ import com.aarav.chatapplication.presentation.components.MessageStatusIcon
 import com.aarav.chatapplication.presentation.components.MyAlertDialog
 import com.aarav.chatapplication.presentation.home.ChatViewModel
 import com.aarav.chatapplication.ui.theme.manrope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -74,7 +77,7 @@ fun ChatScreen(
     otherUserId: String,
     currentUsername: String,
     back: () -> Unit,
-    navigateToCall: () -> Unit,
+    navigateToCall: (Boolean) -> Unit,
     chatViewModel: ChatViewModel,
     callViewModel: CallViewModel
 ) {
@@ -98,6 +101,10 @@ fun ChatScreen(
             listState.animateScrollToItem(uiState.messages.lastIndex)
         }
     }
+
+
+
+    val scope = rememberCoroutineScope()
 
     MyAlertDialog(
         shouldShowDialog = uiState.showErrorDialog,
@@ -228,27 +235,60 @@ fun ChatScreen(
                             }
                         }
 
+
                         IconButton(
                             onClick = {
-                                navigateToCall()
 
                                 val call = CallModel(
                                     callId = chatId,
                                     callerId = myId,
                                     callerName = currentUsername,
-                                    participants = listOf(otherUserId),
+                                    receiverId = otherUserId,
+                                    videoCall = true
                                 )
 
-                                callViewModel.startCall(
-                                    call,
-                                    myId
+                                scope.launch {
+                                    callViewModel.startCall(call, myId)
+
+                                    delay(300)
+
+                                    navigateToCall(true)
+                                }
+
+                            },
+                            modifier = Modifier
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.camera_on),
+                                contentDescription = "video call",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+
+                                val call = CallModel(
+                                    callId = chatId,
+                                    callerId = myId,
+                                    callerName = currentUsername,
+                                    receiverId = otherUserId,
+                                    videoCall = false
                                 )
+
+                                scope.launch {
+                                    callViewModel.startCall(call, myId)
+
+                                    delay(300)
+
+                                    navigateToCall(false)
+                                }
                             },
                             modifier = Modifier
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.phone),
-                                contentDescription = "call",
+                                contentDescription = "audio call",
                                 modifier = Modifier.size(24.dp)
                             )
                         }

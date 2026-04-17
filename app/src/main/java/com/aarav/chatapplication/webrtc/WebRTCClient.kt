@@ -119,19 +119,19 @@ class WebRTCClient
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
             .createPeerConnectionFactory()
 
-        val factory = peerConnectionFactory ?: return
 
-        val constraints = MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
-            mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
-            mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
-            mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
-        }
 
-        localAudioSource = factory.createAudioSource(constraints)
-        localAudioTrack = factory.createAudioTrack("audioTrack", localAudioSource)
-        localAudioTrack?.setEnabled(true)
-        configureAudioForCall()
+//        val constraints = MediaConstraints().apply {
+//            mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+//            mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+//            mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+//            mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+//        }
+//
+//        localAudioSource = factory.createAudioSource(constraints)
+//        localAudioTrack = factory.createAudioTrack("audioTrack", localAudioSource)
+//        localAudioTrack?.setEnabled(true)
+//        configureAudioForCall()
 
     }
 
@@ -146,10 +146,13 @@ class WebRTCClient
             return
         }
 
-        if (localAudioTrack == null || localVideoTrack == null) {
-            Log.e(TAG, "Tracks not ready: skipping PC creation for $userId (audio=${localAudioTrack != null}, video=${localVideoTrack != null})")
-            return
-        }
+//        if (localAudioTrack == null || localVideoTrack == null) {
+//            Log.e(
+//                TAG,
+//                "Tracks not ready: skipping PC creation for $userId (audio=${localAudioTrack != null}, video=${localVideoTrack != null})"
+//            )
+//            return
+//        }
 
         val iceServers = listOf(
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302")
@@ -168,6 +171,8 @@ class WebRTCClient
             return
         }
 
+        createAudioTrack()
+
         localAudioTrack?.let { pc.addTrack(it, streamIds) }
         localAudioTrack?.setEnabled(true)
         localVideoTrack?.let { pc.addTrack(it, streamIds) }
@@ -175,6 +180,22 @@ class WebRTCClient
         peerConnections[userId] = pc
         remoteDescriptionSet.remove(userId)
         Log.d("MESH", "✓ PeerConnection CREATED for $userId (total PCs: ${peerConnections.size})")
+    }
+
+    fun createAudioTrack() {
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        }
+
+        val factory = peerConnectionFactory ?: return
+
+        localAudioSource = factory.createAudioSource(constraints)
+        localAudioTrack = factory.createAudioTrack("audioTrack", localAudioSource)
+        localAudioTrack?.setEnabled(true)
+        configureAudioForCall()
     }
 
     private fun createObserver(userId: String) = object : PeerConnection.Observer {
@@ -202,7 +223,10 @@ class WebRTCClient
                     _connectionState.value = "CONNECTED"
                     enableAllAudio()
                 }
-                PeerConnection.PeerConnectionState.CONNECTING -> _connectionState.value = "CONNECTING"
+
+                PeerConnection.PeerConnectionState.CONNECTING -> _connectionState.value =
+                    "CONNECTING"
+
                 PeerConnection.PeerConnectionState.FAILED -> {
                     connectedPeers.remove(userId)
                     peerConnections.remove(userId)
@@ -210,12 +234,14 @@ class WebRTCClient
                     Log.e("MESH", "[$userId] PeerConnection FAILED — check ICE/TURN servers")
                     _connectionState.value = "FAILED"
                 }
+
                 PeerConnection.PeerConnectionState.DISCONNECTED -> {
                     connectedPeers.remove(userId)
                     peerConnections.remove(userId)
                     onPeerConnected?.invoke(userId)
                     _connectionState.value = "DISCONNECTED"
                 }
+
                 PeerConnection.PeerConnectionState.CLOSED -> {
                     if (!isClosingAllConnections) {
                         removePeerConnection(userId)
@@ -225,6 +251,7 @@ class WebRTCClient
                         _connectionState.value = "IDLE"
                     }
                 }
+
                 else -> Unit
             }
         }
@@ -239,13 +266,19 @@ class WebRTCClient
                 track.setEnabled(true)
                 track.setVolume(10.0)
                 remoteAudioTracks[userId] = track
-                Log.d("MESH", "[$userId] ✓ Remote AUDIO track enabled (total audio: ${remoteAudioTracks.size})")
+                Log.d(
+                    "MESH",
+                    "[$userId] ✓ Remote AUDIO track enabled (total audio: ${remoteAudioTracks.size})"
+                )
             }
             if (track is VideoTrack) {
                 _allTracks.value = _allTracks.value.toMutableMap().apply {
                     put(userId, track)
                 }
-                Log.d("MESH", "[$userId] ✓ Remote VIDEO track added (total videos: ${_allTracks.value.size})")
+                Log.d(
+                    "MESH",
+                    "[$userId] ✓ Remote VIDEO track added (total videos: ${_allTracks.value.size})"
+                )
             }
         }
     }
@@ -261,7 +294,8 @@ class WebRTCClient
     }
 
     private fun refreshAudioRouting() {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        val audioManager =
+            context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         if (audioManager.mode != AudioManager.MODE_IN_COMMUNICATION) {
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         }
@@ -272,7 +306,10 @@ class WebRTCClient
 
         val factory = peerConnectionFactory ?: return null
 
-        if (localVideoTrack != null) return localVideoTrack
+        if (localVideoTrack != null) {
+            videoCapturer?.startCapture(720, 1280, 30)
+            return localVideoTrack
+        }
 
         if (videoCapturer == null) {
             videoCapturer = createCameraCapture()
@@ -529,22 +566,24 @@ class WebRTCClient
 
     }
 
+    fun enableVideo() {
+        localVideoTrack?.setEnabled(true)
+    }
+
+    fun disableVideo() {
+        localVideoTrack?.setEnabled(false)
+    }
+
     fun closeConnection() {
 
         try {
-            if (isCapturing) {
-                videoCapturer?.stopCapture()
-                videoCapturer?.dispose()
-                videoCapturer = null
-                isCapturing = false
-            }
+
 
             isClosingAllConnections = true
             peerConnections.values.toList().forEach {
                 it.close()
                 it.dispose()
             }
-            isClosingAllConnections = false
 
             peerConnections.clear()
             pendingIceCandidates.clear()
@@ -557,6 +596,23 @@ class WebRTCClient
         } catch (e: Exception) {
             Log.e("CALL", "Error closing peer connection", e)
         } finally {
+
+            videoCapturer?.stopCapture()
+            videoCapturer?.dispose()
+            videoCapturer = null
+
+            localAudioTrack?.dispose()
+            localAudioTrack = null
+
+            localVideoTrack?.dispose()
+            localVideoTrack = null
+
+            localVideoSource?.dispose()
+            localVideoSource = null
+
+            localAudioSource?.dispose()
+            localAudioSource = null
+
             isClosingAllConnections = false
         }
     }
@@ -588,7 +644,8 @@ class WebRTCClient
 
     private fun configureAudioForCall() {
         if (isAudioConfigured) return
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        val audioManager =
+            context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         previousAudioMode = audioManager.mode
         previousSpeakerphone = audioManager.isSpeakerphoneOn
         previousMicMute = audioManager.isMicrophoneMute
@@ -600,7 +657,8 @@ class WebRTCClient
 
     private fun restoreAudioAfterCall() {
         if (!isAudioConfigured) return
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        val audioManager =
+            context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         audioManager.mode = previousAudioMode
         audioManager.isSpeakerphoneOn = previousSpeakerphone
         audioManager.isMicrophoneMute = previousMicMute

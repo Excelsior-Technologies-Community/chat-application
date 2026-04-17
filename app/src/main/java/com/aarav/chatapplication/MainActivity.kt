@@ -2,6 +2,7 @@ package com.aarav.chatapplication
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.statusBarColor = Color.TRANSPARENT
 
         setContent {
             AppTheme {
@@ -214,14 +216,26 @@ class MainActivity : ComponentActivity() {
                         IncomingCallBanner(
                             callerName = if (callInfo?.callerName.isNullOrBlank())
                                 "User"
-                            else if(!callInfo?.callerName.isNullOrBlank() && callInfo?.isGroupCall() == true) {
+                            else if(!callInfo?.callerName.isNullOrBlank() && callInfo?.groupCall == true) {
                                 "${callInfo?.callerName} started a group call"
                             }
                             else
                                 callInfo?.callerName!!,
                             onAccept = {
                                 showCallBanner = false
-                                navController.navigate("call/${callInfo?.callId}/${currentUserId}/${callInfo?.callerName}/${false}")
+                                callInfo?.let {
+                                    navController.navigate(
+                                        NavRoute.Call
+                                            .createRoute(
+                                                callId = it.callId,
+                                                myUserId = currentUserId ?: "",
+                                                callerName = it.callerName ?: "User",
+                                                isCaller = false,
+                                                isGroupCall = it.groupCall,
+                                                isVideoCall = it.groupCall
+                                            )
+                                    )
+                                }
                             },
                             onDecline = {
                                 showCallBanner = false
@@ -232,7 +246,7 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier
                                 .align(
-                                    androidx.compose.ui.Alignment.TopCenter
+                                    Alignment.TopCenter
                                 )
                                 .padding(top = 48.dp)
                         )
