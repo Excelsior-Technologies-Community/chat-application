@@ -35,8 +35,13 @@ class WebRTCClient
     @ApplicationContext val context: android.content.Context
 ) {
 
+    private val TAG = "CONNECTION"
+
+    private val streamIds = listOf("ARDAMS")
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnections = mutableMapOf<String, PeerConnection>()
+
+    private val connectedPeers = mutableSetOf<String>()
 
     private val _iceCandidateFlow = MutableSharedFlow<Pair<IceCandidate, String>>(
         replay = 10
@@ -71,6 +76,8 @@ class WebRTCClient
     private val pendingIceCandidates = mutableMapOf<String, MutableList<IceCandidate>>()
     private val remoteDescriptionSet = mutableSetOf<String>()
     private val remoteAudioTracks = mutableMapOf<String, AudioTrack>()
+
+    var onPeerConnected: ((String) -> Unit)? = null
 
 
     fun init() {
@@ -130,26 +137,26 @@ class WebRTCClient
 
     fun createPeerConnection(userId: String) {
         val factory = peerConnectionFactory ?: run {
-            Log.e("MESH", "createPeerConnection: factory is null!")
+            Log.e(TAG, "createPeerConnection: factory is null")
             return
         }
 
         if (peerConnections.containsKey(userId)) {
-            Log.d("MESH", "PC already exists for $userId — skipping")
+            Log.d(TAG, "PC already exists for $userId: skipping")
             return
         }
 
         if (localAudioTrack == null || localVideoTrack == null) {
-            Log.e("MESH", "Tracks not ready — skipping PC creation for $userId (audio=${localAudioTrack != null}, video=${localVideoTrack != null})")
+            Log.e(TAG, "Tracks not ready: skipping PC creation for $userId (audio=${localAudioTrack != null}, video=${localVideoTrack != null})")
             return
         }
 
         val iceServers = listOf(
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302")
                 .createIceServer(),
-            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
-                .setUsername("openrelayproject")
-                .setPassword("openrelayproject")
+            PeerConnection.IceServer.builder("turn:relay1.expressturn.com:3478")
+                .setUsername("efzP6H3J5P3S1ZC8")
+                .setPassword("k4wTzZy6WzZx3n5F")
                 .createIceServer()
         )
 
@@ -157,14 +164,13 @@ class WebRTCClient
             iceServers,
             createObserver(userId)
         ) ?: run {
-            Log.e("MESH", "factory.createPeerConnection returned null for $userId")
+            Log.e(TAG, "factory.createPeerConnection returned null for $userId")
             return
         }
 
-        val streamIds = listOf("ARDAMS")
         localAudioTrack?.let { pc.addTrack(it, streamIds) }
-        localVideoTrack?.let { pc.addTrack(it, streamIds) }
         localAudioTrack?.setEnabled(true)
+        localVideoTrack?.let { pc.addTrack(it, streamIds) }
 
         peerConnections[userId] = pc
         remoteDescriptionSet.remove(userId)
@@ -190,18 +196,30 @@ class WebRTCClient
             Log.i("MESH", "[$userId] PeerConnection state → $newState")
             when (newState) {
                 PeerConnection.PeerConnectionState.CONNECTED -> {
+                    if (connectedPeers.add(userId)) {
+                        onPeerConnected?.invoke(userId)
+                    }
                     _connectionState.value = "CONNECTED"
                     enableAllAudio()
                 }
                 PeerConnection.PeerConnectionState.CONNECTING -> _connectionState.value = "CONNECTING"
                 PeerConnection.PeerConnectionState.FAILED -> {
+                    connectedPeers.remove(userId)
+                    peerConnections.remove(userId)
+                    onPeerConnected?.invoke(userId)
                     Log.e("MESH", "[$userId] PeerConnection FAILED — check ICE/TURN servers")
                     _connectionState.value = "FAILED"
                 }
-                PeerConnection.PeerConnectionState.DISCONNECTED -> _connectionState.value = "DISCONNECTED"
+                PeerConnection.PeerConnectionState.DISCONNECTED -> {
+                    connectedPeers.remove(userId)
+                    peerConnections.remove(userId)
+                    onPeerConnected?.invoke(userId)
+                    _connectionState.value = "DISCONNECTED"
+                }
                 PeerConnection.PeerConnectionState.CLOSED -> {
                     if (!isClosingAllConnections) {
                         removePeerConnection(userId)
+                        connectedPeers.remove(userId)
                     }
                     if (peerConnections.isEmpty()) {
                         _connectionState.value = "IDLE"
@@ -251,22 +269,10 @@ class WebRTCClient
     }
 
     fun startLocalVideo(): VideoTrack? {
-        val peerConnectionFactory = peerConnectionFactory ?: return null
 
-        if (localVideoTrack != null) {
-            if (!isCapturing) {
-                try {
-                    videoCapturer?.startCapture(720, 1280, 30)
-                    isCapturing = true
-                } catch (e: Exception) {
-                    Log.e("CALL", "Failed to restart local capture", e)
-                }
-            }
-            localVideoTrack?.setEnabled(true)
-            _allTracks.value = _allTracks.value.toMutableMap().apply { localVideoTrack?.let { put("LOCAL", it) } }
-            configureAudioForCall()
-            return localVideoTrack
-        }
+        val factory = peerConnectionFactory ?: return null
+
+        if (localVideoTrack != null) return localVideoTrack
 
         if (videoCapturer == null) {
             videoCapturer = createCameraCapture()
@@ -280,7 +286,7 @@ class WebRTCClient
         }
 
         if (localVideoSource == null) {
-            localVideoSource = peerConnectionFactory.createVideoSource(false)
+            localVideoSource = factory.createVideoSource(false)
         }
 
         videoCapturer?.initialize(
@@ -290,18 +296,13 @@ class WebRTCClient
         )
 
         videoCapturer?.startCapture(720, 1280, 30)
-        isCapturing = true
 
-        Log.d("CALL", "startCapture called")
-
-        localVideoTrack = peerConnectionFactory.createVideoTrack("videoTrack", localVideoSource)
+        localVideoTrack = factory.createVideoTrack("videoTrack", localVideoSource)
         localVideoTrack?.setEnabled(true)
-        localVideoTrack?.let {
-            _allTracks.value = _allTracks.value.toMutableMap().apply {
-                put("LOCAL", it)
-            }
+
+        _allTracks.value = _allTracks.value.toMutableMap().apply {
+            put("LOCAL", localVideoTrack!!)
         }
-        configureAudioForCall()
 
         return localVideoTrack
     }
@@ -329,6 +330,17 @@ class WebRTCClient
         }
     }
 
+    fun stopLocalVideo() {
+        try {
+            videoCapturer?.stopCapture()
+            Log.d(TAG, "Stop VideoCapture")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "stopCapture error", e)
+        }
+//        videoCapturer?.dispose()
+//        videoCapturer = null
+    }
 
     fun toggleMute(isMuted: Boolean) {
         Log.d("CALL", "MUTE: $isMuted")
@@ -368,6 +380,8 @@ class WebRTCClient
             }
 
             override fun onCreateFailure(p0: String?) {
+                peerConnections.remove(userId)
+                onPeerConnected?.invoke(userId)
                 Log.e("MESH", "FAILED to create offer for $userId: $p0")
             }
 
@@ -520,6 +534,8 @@ class WebRTCClient
         try {
             if (isCapturing) {
                 videoCapturer?.stopCapture()
+                videoCapturer?.dispose()
+                videoCapturer = null
                 isCapturing = false
             }
 
@@ -533,6 +549,7 @@ class WebRTCClient
             peerConnections.clear()
             pendingIceCandidates.clear()
             remoteDescriptionSet.clear()
+            connectedPeers.clear()
             remoteAudioTracks.clear()
             _connectionState.value = "NEW"
             _allTracks.value = _allTracks.value.filterKeys { it == "LOCAL" }

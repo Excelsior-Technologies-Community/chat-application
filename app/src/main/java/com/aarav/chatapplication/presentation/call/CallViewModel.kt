@@ -1,5 +1,6 @@
 package com.aarav.chatapplication.presentation.call
 
+import android.media.AudioManager
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,14 +15,22 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import org.webrtc.VideoTrack
 import javax.inject.Inject
+import kotlin.Boolean
+import kotlin.Pair
+import kotlin.String
+import kotlin.collections.listOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.mutableSetOf
 
-private const val TAG = "MESH"
+private const val TAG = "CONNECTION"
 
 @HiltViewModel
 class CallViewModel @Inject constructor(
@@ -35,6 +44,9 @@ class CallViewModel @Inject constructor(
     private val handledOfferKeys = mutableSetOf<String>()
     private val handledAnswerKeys = mutableSetOf<String>()
     private val peerCreated = mutableSetOf<String>()
+
+    private val connectionQueue = ArrayDeque<String>()
+    private var isProcessing = false
 
     private var timerStarted = false
 
@@ -63,8 +75,8 @@ class CallViewModel @Inject constructor(
     val events = _events.receiveAsFlow()
 
     val tracks = webRTCClient.allTracks
-    private val _localVideoTrack = MutableStateFlow<VideoTrack?>(null)
-    val localVideoTrack = _localVideoTrack.asStateFlow()
+//    private val _localVideoTrack = MutableStateFlow<VideoTrack?>(null)
+//    val localVideoTrack = _localVideoTrack.asStateFlow()
     val eglContext = webRTCClient.eglContext
 
     private var connectionJob: Job? = null
@@ -75,10 +87,24 @@ class CallViewModel @Inject constructor(
     private var timeoutJob: Job? = null
 
     init {
+
+        webRTCClient.onPeerConnected = { userId ->
+            Log.d(TAG, "[$myUserId] Connected → $userId")
+
+            isProcessing = false
+
+            peerCreated.remove(userId)
+
+            viewModelScope.launch {
+                delay(300)
+                processQueue()
+            }
+        }
+
         connectionJob = viewModelScope.launch {
             webRTCClient.connectionState.collect { state ->
                 if (!isEnding) {
-                    Log.d(TAG, "WebRTC connection state -> $state")
+                    Log.d(TAG, "WebRTC connection state: $state")
                     when (state) {
                         "CONNECTED" -> {
                             callStateManager.updateState("CONNECTED")
@@ -111,13 +137,13 @@ class CallViewModel @Inject constructor(
         viewModelScope.launch {
             webRTCClient.init()
             webRTCClient.startLocalVideo()
-            _localVideoTrack.value = webRTCClient.localVideoTrack
+            //_localVideoTrack.value = webRTCClient.localVideoTrack
 
             signalingClient.createCall(call)
 
             val others = call.participants.filter { it != myUserId }
             Log.d(TAG, "[$myUserId] Will send offers to: $others")
-            others.forEach { userId -> sendOfferTo(call.callId, userId) }
+            others.forEach { userId -> enqueue(userId) }
 
             startObservers(call.callId)
         }
@@ -148,7 +174,7 @@ class CallViewModel @Inject constructor(
         viewModelScope.launch {
             webRTCClient.init()
             webRTCClient.startLocalVideo()
-            _localVideoTrack.value = webRTCClient.localVideoTrack
+            //_localVideoTrack.value = webRTCClient.localVideoTrack
             startObservers(callId)
         }
     }
@@ -157,6 +183,8 @@ class CallViewModel @Inject constructor(
         handledOfferKeys.clear()
         handledAnswerKeys.clear()
         peerCreated.clear()
+        connectionQueue.clear()
+        isProcessing = false
         isAnswered = false
         isEnding = false
         timerStarted = false
@@ -173,9 +201,34 @@ class CallViewModel @Inject constructor(
         }
     }
 
+    private fun enqueue(userId: String) {
+        if (connectionQueue.contains(userId)) return
+
+        Log.d(TAG, "[$myUserId] Queue add: $userId")
+        connectionQueue.add(userId)
+        processQueue()
+    }
+
+    private fun processQueue() {
+        if (isProcessing || connectionQueue.isEmpty()) return
+
+        val next = connectionQueue.removeFirst()
+        isProcessing = true
+
+        Log.d(TAG, "[$myUserId] Processing: $next")
+
+        val callId = activeCallId
+        if (callId == null) {
+            isProcessing = false
+            return
+        }
+
+        sendOfferTo(callId, next)
+    }
+
     private fun sendOfferTo(callId: String, userId: String) {
         ensurePeerConnection(userId)
-        Log.d(TAG, "[$myUserId] Creating & sending OFFER → $userId")
+        Log.d(TAG, "[$myUserId] Creating & sending OFFER for: $userId")
         webRTCClient.createOffer(userId) { sdp ->
             viewModelScope.launch {
                 if (!isEnding) {
@@ -183,7 +236,7 @@ class CallViewModel @Inject constructor(
                         callId, userId,
                         OfferModel(sdp.description, myUserId)
                     )
-                    Log.d(TAG, "[$myUserId] OFFER sent → $userId (Firebase key: ${myUserId}_$userId)")
+                    Log.d(TAG, "[$myUserId] OFFER sent to $userId (Firebase key: ${myUserId}_$userId)")
                 }
             }
         }
@@ -198,7 +251,7 @@ class CallViewModel @Inject constructor(
             signalingClient.listenForCall(callId).collect { call ->
                 if (isEnding) return@collect
                 if (call == null) {
-                    Log.w(TAG, "[$myUserId] Call data is null — call may have been deleted")
+                    Log.w(TAG, "[$myUserId] Call data is null: call may have been deleted")
                     return@collect
                 }
 
@@ -214,7 +267,7 @@ class CallViewModel @Inject constructor(
                     return@collect
                 }
 
-                // ── MESH: discover new participants and decide who offers ──
+                // MESH: discover new participants and decide who offers
                 call.participants.forEach { peerId ->
                     if (peerId == myUserId) return@forEach
                     if (peerCreated.contains(peerId)) return@forEach
@@ -222,19 +275,19 @@ class CallViewModel @Inject constructor(
                     val iAmInitiator = isCaller || myUserId < peerId
                     if (iAmInitiator) {
                         Log.d(TAG, "[$myUserId] Mesh: I should offer to $peerId (isCaller=$isCaller, myId<peerId=${myUserId < peerId})")
-                        sendOfferTo(callId, peerId)
+                        enqueue(peerId)
                     } else {
                         Log.d(TAG, "[$myUserId] Mesh: waiting for $peerId to offer to me")
                     }
                 }
 
-                // ── OFFERS: process offers addressed to me ──
+                // OFFERS: process offers addressed to me
                 call.offers.forEach { (key, offer) ->
                     if (!key.endsWith("_$myUserId")) return@forEach
                     if (!handledOfferKeys.add(key)) return@forEach
 
                     val senderId = offer.senderId
-                    Log.d(TAG, "[$myUserId] ◀ OFFER received from $senderId (key=$key)")
+                    Log.d(TAG, "[$myUserId]: OFFER received from $senderId (key=$key)")
 
                     if (!isAnswered) {
                         isAnswered = true
@@ -248,19 +301,19 @@ class CallViewModel @Inject constructor(
                         viewModelScope.launch {
                             if (!isEnding) {
                                 signalingClient.sendAnswer(callId, myUserId, senderId, answer.description)
-                                Log.d(TAG, "[$myUserId] ANSWER sent → $senderId (key: ${myUserId}_$senderId)")
+                                Log.d(TAG, "[$myUserId] ANSWER sent: $senderId (key: ${myUserId}_$senderId)")
                             }
                         }
                     }
                 }
 
-                // ── ANSWERS: process answers addressed to me ──
+                // ANSWERS: process answers addressed to me
                 call.answers.forEach { (key, answer) ->
                     if (!key.endsWith("_$myUserId")) return@forEach
                     if (!handledAnswerKeys.add(key)) return@forEach
 
                     val senderId = key.removeSuffix("_$myUserId")
-                    Log.d(TAG, "[$myUserId] ◀ ANSWER received from $senderId (key=$key)")
+                    Log.d(TAG, "[$myUserId]: ANSWER received from $senderId (key=$key)")
 
                     if (!isAnswered) {
                         isAnswered = true
@@ -270,7 +323,6 @@ class CallViewModel @Inject constructor(
                     webRTCClient.onAnswerReceived(senderId, answer)
                 }
 
-                // Log summary
                 Log.d(TAG, "[$myUserId] Status: peers=${peerCreated.toList()}, offers=${handledOfferKeys.toList()}, answers=${handledAnswerKeys.toList()}")
             }
         }
