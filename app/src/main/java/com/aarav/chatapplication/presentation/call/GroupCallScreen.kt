@@ -10,6 +10,13 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,8 +24,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -66,9 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.aarav.chatapplication.R
 import com.aarav.chatapplication.presentation.components.AddParticipantsSheet
-import com.aarav.chatapplication.presentation.components.CreateChatModalSheet
 import com.aarav.chatapplication.presentation.components.CustomBottomSheet
-import com.aarav.chatapplication.ui.theme.hankenGrotesk
 import com.aarav.chatapplication.utils.formatTime
 import kotlinx.coroutines.delay
 import org.webrtc.EglBase
@@ -254,7 +258,7 @@ fun GroupCallScreen(
     }
 
 
-    if(showSheet) {
+    if (showSheet) {
         CustomBottomSheet(
             sheetState = sheetState,
             onDismiss = {
@@ -352,11 +356,11 @@ fun GroupCallScreen(
                             "CONNECTED" -> "Connected"
                             "DISCONNECTED" -> "Disconnected"
                             "FAILED" -> "Failed"
-                            "CLOSED", "ENDED" -> "GroupCall Ended"
+                            "CLOSED", "ENDED" -> "Group Call Ended"
                             "BUSY" -> "User is Busy"
                             "REJECTED" -> "GroupCall Declined"
                             "MISSED" -> "Missed GroupCall"
-                            "IDLE" -> if (callEnded) "GroupCall Ended" else "Initializing..."
+                            "IDLE" -> if (callEnded) "Group Call Ended" else "Initializing..."
                             else -> "Initializing..."
                         },
                         color = Color.White,
@@ -760,27 +764,39 @@ fun SmartVideoGrid(
         }
 
         else -> {
-            Column(Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(
+                    items = users,
+                    key = { it.key },
+                    span = { user ->
 
-                var index = 0
+                        val isLastOdd =
+                            (count % columns != 0) &&
+                                    (user == users.last())
 
-                repeat(rows) { rowIndex ->
-
-                    val remaining = count - index
-                    val itemsInThisRow = if (rowIndex == rows - 1) {
-                        remaining
-                    } else {
-                        columns
+                        if (isLastOdd) {
+                            GridItemSpan(columns)
+                        } else {
+                            GridItemSpan(1)
+                        }
                     }
+                ) { user ->
 
-                    Row(
-                        modifier = Modifier.weight(1f)
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
                     ) {
-
-                        repeat(itemsInThisRow) {
-
-                            val user = users[index]
-
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateContentSize(
+                                    animationSpec = tween(400)
+                                )
+                        ) {
                             VideoItem(
                                 track = user.value,
                                 isLocalVideoEnabled = isLocalVideoEnabled,
@@ -790,12 +806,8 @@ fun SmartVideoGrid(
                                 eglBaseContext = eglBaseContext,
                                 mediaState = mediaStates[user.key],
                                 userName = userNames[user.key] ?: user.key,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
+                                modifier = Modifier.fillMaxSize()
                             )
-
-                            index++
                         }
                     }
                 }
@@ -827,8 +839,17 @@ fun VideoItem(
         SurfaceViewRenderer(context).apply {
             clipToOutline = true
             outlineProvider = object : android.view.ViewOutlineProvider() {
-                override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, 16f * context.resources.displayMetrics.density)
+                override fun getOutline(
+                    view: android.view.View,
+                    outline: android.graphics.Outline
+                ) {
+                    outline.setRoundRect(
+                        0,
+                        0,
+                        view.width,
+                        view.height,
+                        16f * context.resources.displayMetrics.density
+                    )
                 }
             }
             addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
