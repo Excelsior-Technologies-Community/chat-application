@@ -8,6 +8,7 @@ import com.aarav.chatapplication.data.model.CallHistoryModel
 import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.aarav.chatapplication.data.model.OfferModel
+import com.aarav.chatapplication.data.model.MediaState
 import com.aarav.chatapplication.domain.model.User
 import com.aarav.chatapplication.domain.repository.ChatListRepository
 import com.aarav.chatapplication.domain.repository.GroupChatRepository
@@ -108,6 +109,9 @@ class CallViewModel @Inject constructor(
     private val _isVideoEnabled = MutableStateFlow(false)
     val isVideoEnabled = _isVideoEnabled.asStateFlow()
 
+    private val _mediaStates = MutableStateFlow<Map<String, MediaState>>(emptyMap())
+    val mediaStates = _mediaStates.asStateFlow()
+
     init {
 
         webRTCClient.onPeerConnected = { userId ->
@@ -173,6 +177,7 @@ class CallViewModel @Inject constructor(
                 webRTCClient.startLocalVideo()
                 _isVideoEnabled.value = true
             }
+            updateMyMediaState()
 
             //_localVideoTrack.value = webRTCClient.localVideoTrack
 
@@ -219,6 +224,7 @@ class CallViewModel @Inject constructor(
                 webRTCClient.startLocalVideo()
                 _isVideoEnabled.value = true
             }
+            updateMyMediaState()
 
             //_localVideoTrack.value = webRTCClient.localVideoTrack
             startObservers(callId)
@@ -314,6 +320,8 @@ class CallViewModel @Inject constructor(
                     }
                     return@collect
                 }
+
+                _mediaStates.value = call.mediaStates
 //
 //                // MESH: discover new participants and decide who offers
 //                call.participants.forEach { peerId ->
@@ -464,6 +472,7 @@ class CallViewModel @Inject constructor(
         } else {
             webRTCClient.disableVideo()
         }
+        updateMyMediaState()
     }
 
 //        activeCallId?.let { id ->
@@ -480,6 +489,19 @@ class CallViewModel @Inject constructor(
         val newState = !_isMuted.value
         _isMuted.value = newState
         webRTCClient.toggleMute(newState)
+        updateMyMediaState()
+    }
+
+    private fun updateMyMediaState() {
+        activeCallId?.let { id ->
+            viewModelScope.launch {
+                signalingClient.updateMediaState(
+                    id, 
+                    myUserId, 
+                    MediaState(muted = _isMuted.value, videoEnabled = _isVideoEnabled.value)
+                )
+            }
+        }
     }
 
     fun endCall(callId: String) {

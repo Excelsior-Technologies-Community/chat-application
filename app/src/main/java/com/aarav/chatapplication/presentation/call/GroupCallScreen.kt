@@ -109,10 +109,10 @@ fun GroupCallScreen(
 
 
     val isVideoEnabled by viewModel.isVideoEnabled.collectAsState()
+    val mediaStates by viewModel.mediaStates.collectAsState()
 
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -295,7 +295,8 @@ fun GroupCallScreen(
                         isVideoEnabled,
                         myUserId,
                         context,
-                        eglBaseContext!!
+                        eglBaseContext!!,
+                        mediaStates
                     )
                 }
             }
@@ -706,7 +707,8 @@ fun SmartVideoGrid(
     isLocalVideoEnabled: Boolean,
     myUserId: String,
     context: Context,
-    eglBaseContext: EglBase.Context
+    eglBaseContext: EglBase.Context,
+    mediaStates: Map<String, com.aarav.chatapplication.data.model.MediaState>
 ) {
 
     val users = tracks.entries.toList().sortedBy { it.key }
@@ -730,6 +732,7 @@ fun SmartVideoGrid(
                 myUserId,
                 context,
                 eglBaseContext,
+                mediaStates[users[0].key],
                 Modifier.fillMaxSize()
             )
         }
@@ -744,6 +747,7 @@ fun SmartVideoGrid(
                         myUserId,
                         context,
                         eglBaseContext,
+                        mediaStates[it.key],
                         Modifier.weight(1f)
                     )
                 }
@@ -779,6 +783,7 @@ fun SmartVideoGrid(
                                 myUserId = myUserId,
                                 context = context,
                                 eglBaseContext = eglBaseContext,
+                                mediaState = mediaStates[user.key],
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
@@ -822,6 +827,7 @@ fun VideoGrid(
                 myUserId,
                 context,
                 eglBaseContext,
+                null,
                 Modifier.fillMaxSize()
             )
         }
@@ -836,6 +842,7 @@ fun VideoGrid(
                         myUserId,
                         context,
                         eglBaseContext,
+                        null,
                         Modifier.weight(1f)
                     )
                 }
@@ -855,6 +862,7 @@ fun VideoGrid(
                         myUserId,
                         context,
                         eglBaseContext,
+                        null,
                         Modifier.aspectRatio(1f)
                     )
                 }
@@ -872,6 +880,7 @@ fun VideoItem(
     myUserId: String,
     context: Context,
     eglBaseContext: EglBase.Context,
+    mediaState: com.aarav.chatapplication.data.model.MediaState?,
     modifier: Modifier = Modifier
 ) {
 
@@ -880,7 +889,14 @@ fun VideoItem(
     val isLocal = userId == myUserId || userId == "LOCAL"
 
     val view = remember(eglBaseContext) {
-        SurfaceViewRenderer(context)
+        SurfaceViewRenderer(context).apply {
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, 16f * context.resources.displayMetrics.density)
+                }
+            }
+        }
     }
 
 
@@ -901,13 +917,18 @@ fun VideoItem(
     }
 
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .padding(4.dp)
+            .clip(RoundedCornerShape(16.dp))
     ) {
-        if (isLocal && !isLocalVideoEnabled) {
+        val showVideo = if (isLocal) isLocalVideoEnabled else (mediaState?.videoEnabled ?: true)
+        val isMuted = mediaState?.muted ?: false
+
+        if (!showVideo) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerLow),
                 contentAlignment = Alignment.Center
             ) {
@@ -918,17 +939,17 @@ fun VideoItem(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "You",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
+//                    Spacer(Modifier.height(8.dp))
+//                    Text(
+//                        if (isLocal) "You" else userId,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                        fontSize = 12.sp
+//                    )
                 }
             }
         } else {
             AndroidView(
-                modifier = modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 factory = {
                     view
                 },
@@ -944,14 +965,29 @@ fun VideoItem(
             )
         }
 
-
-        Text(
-            text = if (isLocal) "You" else userId,
-            color = Color.White,
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(8.dp)
-        )
+                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isLocal) "You" else userId,
+                color = Color.White,
+                fontSize = 12.sp
+            )
+            if (isMuted) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    painter = painterResource(R.drawable.microphone_off),
+                    contentDescription = "Muted",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
 
