@@ -110,6 +110,7 @@ fun GroupCallScreen(
 
     val isVideoEnabled by viewModel.isVideoEnabled.collectAsState()
     val mediaStates by viewModel.mediaStates.collectAsState()
+    val userNames by viewModel.usersMapping.collectAsState()
 
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -296,7 +297,8 @@ fun GroupCallScreen(
                         myUserId,
                         context,
                         eglBaseContext!!,
-                        mediaStates
+                        mediaStates,
+                        userNames
                     )
                 }
             }
@@ -708,7 +710,8 @@ fun SmartVideoGrid(
     myUserId: String,
     context: Context,
     eglBaseContext: EglBase.Context,
-    mediaStates: Map<String, com.aarav.chatapplication.data.model.MediaState>
+    mediaStates: Map<String, com.aarav.chatapplication.data.model.MediaState>,
+    userNames: Map<String, String>
 ) {
 
     val users = tracks.entries.toList().sortedBy { it.key }
@@ -733,6 +736,7 @@ fun SmartVideoGrid(
                 context,
                 eglBaseContext,
                 mediaStates[users[0].key],
+                userNames[users[0].key] ?: users[0].key,
                 Modifier.fillMaxSize()
             )
         }
@@ -748,6 +752,7 @@ fun SmartVideoGrid(
                         context,
                         eglBaseContext,
                         mediaStates[it.key],
+                        userNames[it.key] ?: it.key,
                         Modifier.weight(1f)
                     )
                 }
@@ -784,6 +789,7 @@ fun SmartVideoGrid(
                                 context = context,
                                 eglBaseContext = eglBaseContext,
                                 mediaState = mediaStates[user.key],
+                                userName = userNames[user.key] ?: user.key,
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
@@ -809,6 +815,7 @@ fun VideoItem(
     context: Context,
     eglBaseContext: EglBase.Context,
     mediaState: com.aarav.chatapplication.data.model.MediaState?,
+    userName: String,
     modifier: Modifier = Modifier
 ) {
 
@@ -905,7 +912,7 @@ fun VideoItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = if (isLocal) "You" else userId,
+                text = if (isLocal) "You" else userName,
                 color = Color.White,
                 fontSize = 12.sp
             )

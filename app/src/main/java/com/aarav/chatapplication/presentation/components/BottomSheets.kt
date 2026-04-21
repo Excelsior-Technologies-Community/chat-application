@@ -187,7 +187,7 @@ fun AddParticipantsSheet(
     val selectedUsers = remember { mutableStateListOf<String>() }
 
     Column(
-        modifier = Modifier.fillMaxHeight()
+        modifier = Modifier.fillMaxWidth()
     ) {
 
         LazyColumn(

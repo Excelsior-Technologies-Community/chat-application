@@ -62,6 +62,9 @@ class CallViewModel @Inject constructor(
     private val _availableUsers = MutableStateFlow<List<User>>(emptyList())
     val availableUsers = _availableUsers.asStateFlow()
 
+    private val _usersMapping = MutableStateFlow<Map<String, String>>(emptyMap())
+    val usersMapping = _usersMapping.asStateFlow()
+
     private val currentParticipants = mutableSetOf<String>()
 
     private var isProcessing = false
@@ -123,6 +126,12 @@ class CallViewModel @Inject constructor(
             viewModelScope.launch {
                 delay(300)
                 processQueue()
+            }
+        }
+
+        viewModelScope.launch {
+            userRepository.getAllUsers().collect { users ->
+                _usersMapping.value = users.associateBy({ it.uid ?: "" }, { it.name ?: "Unknown" })
             }
         }
 
