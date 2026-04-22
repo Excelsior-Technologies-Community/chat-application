@@ -8,6 +8,7 @@ import com.aarav.chatapplication.data.model.CallHistoryModel
 import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.aarav.chatapplication.data.model.OfferModel
+import com.aarav.chatapplication.data.model.MediaState
 import com.aarav.chatapplication.domain.model.User
 import com.aarav.chatapplication.domain.repository.ChatListRepository
 import com.aarav.chatapplication.domain.repository.GroupChatRepository
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.timeout
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.webrtc.PeerConnection
 import org.webrtc.VideoTrack
 import javax.inject.Inject
 import kotlin.Boolean
@@ -56,12 +58,18 @@ class CallViewModel @Inject constructor(
     private val handledAnswerKeys = mutableSetOf<String>()
     private val peerCreated = mutableSetOf<String>()
 
+    val peerStates = webRTCClient.peerStates
+
     private val connectionQueue = ArrayDeque<String>()
 
     private val _availableUsers = MutableStateFlow<List<User>>(emptyList())
     val availableUsers = _availableUsers.asStateFlow()
 
-    private val currentParticipants = mutableSetOf<String>()
+    private val _usersMapping = MutableStateFlow<Map<String, String>>(emptyMap())
+    val usersMapping = _usersMapping.asStateFlow()
+
+    private val _activeParticipants = MutableStateFlow<Set<String>>(emptySet())
+    val activeParticipants = _activeParticipants.asStateFlow()
 
     private var isProcessing = false
 
@@ -108,6 +116,9 @@ class CallViewModel @Inject constructor(
     private val _isVideoEnabled = MutableStateFlow(false)
     val isVideoEnabled = _isVideoEnabled.asStateFlow()
 
+    private val _mediaStates = MutableStateFlow<Map<String, MediaState>>(emptyMap())
+    val mediaStates = _mediaStates.asStateFlow()
+
     init {
 
         webRTCClient.onPeerConnected = { userId ->
@@ -122,29 +133,55 @@ class CallViewModel @Inject constructor(
             }
         }
 
+        viewModelScope.launch {
+            userRepository.getAllUsers().collect { users ->
+                _usersMapping.value = users.associateBy({ it.uid ?: "" }, { it.name ?: "Unknown" })
+            }
+        }
+
         connectionJob = viewModelScope.launch {
-            webRTCClient.connectionState.collect { state ->
-                if (!isEnding) {
-                    Log.d(TAG, "WebRTC connection state: $state")
-                    when (state) {
-                        "CONNECTED" -> {
-                            callStateManager.updateState("CONNECTED")
-                            startTimer()
-                        }
-                        "DISCONNECTED" -> {
-                            if (tracks.value.isNotEmpty()) {
-                                callStateManager.updateState("CONNECTED")
-                            } else {
-                                callStateManager.updateState("DISCONNECTED")
-                            }
-                        }
-//                        "DISCONNECTED" -> {
-//                            callStateManager.updateState("DISCONNECTED")
-//                        }
-                        "FAILED" -> callStateManager.updateState("FAILED")
-                        "NEW" -> {}
-                        else -> callStateManager.updateState("CONNECTING")
+            webRTCClient.peerStates.collect { peerStates ->
+
+                if (isEnding) return@collect
+
+                val states = peerStates.values
+
+                val newState = when {
+
+                    states.any { it == PeerConnection.PeerConnectionState.CONNECTED } -> {
+                        "CONNECTED"
                     }
+
+                    states.any { it == PeerConnection.PeerConnectionState.CONNECTING } -> {
+                        "CONNECTING"
+                    }
+
+                    states.isNotEmpty() && states.all {
+                        it == PeerConnection.PeerConnectionState.DISCONNECTED ||
+                                it == PeerConnection.PeerConnectionState.FAILED
+                    } -> {
+                        "DISCONNECTED"
+                    }
+
+                    states.isEmpty() -> {
+                        "IDLE"
+                    }
+
+                    else -> {
+                        "DISCONNECTED"
+                    }
+                }
+
+                val currentState = callStateManager.callState.value
+
+                if (newState == "CONNECTED" && currentState != "CONNECTED") {
+                    Log.d(TAG, "Call connected → starting timer")
+                    startTimer()
+                }
+
+                if (currentState != newState) {
+                    Log.d(TAG, "GLOBAL STATE → $newState | peers=$peerStates")
+                    callStateManager.updateState(newState)
                 }
             }
         }
@@ -160,8 +197,7 @@ class CallViewModel @Inject constructor(
         activeCallerId = call.callerId
         activeReceiverId = call.participants.keys.firstOrNull { it != myUserId } ?: ""
         //activeReceiverId = call.participants.firstOrNull { it != myUserId } ?: ""
-        currentParticipants.clear()
-        currentParticipants.add(myUserId)
+        _activeParticipants.update { setOf(myUserId) }
         Log.d(TAG, "[$myUserId] STARTING CALL ${call.callId} | participants=${call.participants}")
 
         callStateManager.updateState("CALLING")
@@ -173,6 +209,7 @@ class CallViewModel @Inject constructor(
                 webRTCClient.startLocalVideo()
                 _isVideoEnabled.value = true
             }
+            updateMyMediaState()
 
             //_localVideoTrack.value = webRTCClient.localVideoTrack
 
@@ -205,8 +242,7 @@ class CallViewModel @Inject constructor(
         activeCallId = callId
         callStateManager.activeCallId = callId
         activeReceiverId = myUserId
-        currentParticipants.clear()
-        currentParticipants.add(myUserId)
+        _activeParticipants.update { setOf(myUserId) }
         Log.d(TAG, "[$myUserId] RECEIVING CALL $callId")
 
         callStateManager.updateState("RECEIVING")
@@ -219,6 +255,7 @@ class CallViewModel @Inject constructor(
                 webRTCClient.startLocalVideo()
                 _isVideoEnabled.value = true
             }
+            updateMyMediaState()
 
             //_localVideoTrack.value = webRTCClient.localVideoTrack
             startObservers(callId)
@@ -314,6 +351,8 @@ class CallViewModel @Inject constructor(
                     }
                     return@collect
                 }
+
+                _mediaStates.value = call.mediaStates
 //
 //                // MESH: discover new participants and decide who offers
 //                call.participants.forEach { peerId ->
@@ -343,7 +382,7 @@ class CallViewModel @Inject constructor(
                         isAnswered = true
                         timeoutJob?.cancel()
                     }
-                    callStateManager.updateState("CONNECTING")
+                    //callStateManager.updateState("CONNECTING")
 
                     ensurePeerConnection(senderId)
 
@@ -375,7 +414,7 @@ class CallViewModel @Inject constructor(
                         isAnswered = true
                         timeoutJob?.cancel()
                     }
-                    callStateManager.updateState("CONNECTING")
+                    //callStateManager.updateState("CONNECTING")
 
                     webRTCClient.onAnswerReceived(senderId, answer)
                 }
@@ -392,7 +431,7 @@ class CallViewModel @Inject constructor(
                 if (isJoin) {
 
 
-                    currentParticipants.add(peerId)
+                    _activeParticipants.update { it + peerId }
 
                     if (peerCreated.contains(peerId)) return@collect
 
@@ -407,7 +446,7 @@ class CallViewModel @Inject constructor(
 
                 } else {
 
-                    currentParticipants.remove(peerId)
+                    _activeParticipants.update { it - peerId }
                     Log.d(TAG, "[$myUserId] LEAVE → removing $peerId")
 
                     webRTCClient.removePeerConnection(peerId)
@@ -464,6 +503,7 @@ class CallViewModel @Inject constructor(
         } else {
             webRTCClient.disableVideo()
         }
+        updateMyMediaState()
     }
 
 //        activeCallId?.let { id ->
@@ -480,6 +520,19 @@ class CallViewModel @Inject constructor(
         val newState = !_isMuted.value
         _isMuted.value = newState
         webRTCClient.toggleMute(newState)
+        updateMyMediaState()
+    }
+
+    private fun updateMyMediaState() {
+        activeCallId?.let { id ->
+            viewModelScope.launch {
+                signalingClient.updateMediaState(
+                    id, 
+                    myUserId, 
+                    MediaState(muted = _isMuted.value, videoEnabled = _isVideoEnabled.value)
+                )
+            }
+        }
     }
 
     fun endCall(callId: String) {
@@ -511,7 +564,7 @@ class CallViewModel @Inject constructor(
             _callEnded.value = true
             cleanupJobs()
             signalingClient.cleanupCallData(callId)
-            currentParticipants.clear()
+            _activeParticipants.update { emptySet() }
             activeCallId = null
             callStateManager.updateState("IDLE")
             isEnding = false
@@ -539,7 +592,7 @@ class CallViewModel @Inject constructor(
             _callEnded.value = true
 
             cleanupJobs()
-            currentParticipants.clear()
+            _activeParticipants.update { emptySet() }
             activeCallId = null
             callStateManager.updateState("IDLE")
 
@@ -565,7 +618,7 @@ class CallViewModel @Inject constructor(
             _events.trySend(UiEvent.EndCall)
             _callEnded.value = true
             cleanupJobs()
-            currentParticipants.clear()
+            _activeParticipants.update { emptySet() }
             signalingClient.cleanupCallData(callId)
             activeCallId = null
             callStateManager.updateState("IDLE")
@@ -574,7 +627,7 @@ class CallViewModel @Inject constructor(
     }
 
     fun onAddParticipantClicked() {
-        loadAvailableUsers(myUserId, currentParticipants)
+        loadAvailableUsers(myUserId, _activeParticipants.value)
     }
 
     fun addParticipants(userIds: List<String>) {

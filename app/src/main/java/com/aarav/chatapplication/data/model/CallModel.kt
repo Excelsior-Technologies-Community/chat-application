@@ -15,6 +15,7 @@ data class CallModel(
     val answers: Map<String, String> = emptyMap(),
     val ended: Boolean = false,
     val isBusy: Boolean = false,
+    val mediaStates: Map<String, MediaState> = emptyMap(),
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -37,4 +38,9 @@ data class CallHistoryModel(
 data class OfferModel(
     val sdp: String = "",
     val senderId: String = ""
+)
+
+data class MediaState(
+    val muted: Boolean = false,
+    val videoEnabled: Boolean = false
 )

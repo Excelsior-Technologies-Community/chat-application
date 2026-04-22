@@ -284,4 +284,12 @@ class SignalingClient
         val generatedId = rootRef.key ?: ""
         rootRef.setValue(history.copy(historyId = generatedId)).await()
     }
+
+    suspend fun updateMediaState(callId: String, userId: String, mediaState: com.aarav.chatapplication.data.model.MediaState) {
+        callRef.child(callId)
+            .child("mediaStates")
+            .child(userId)
+            .setValue(mediaState)
+            .await()
+    }
 }

@@ -10,6 +10,13 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,8 +24,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -50,7 +56,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,12 +71,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.aarav.chatapplication.R
 import com.aarav.chatapplication.presentation.components.AddParticipantsSheet
-import com.aarav.chatapplication.presentation.components.CreateChatModalSheet
 import com.aarav.chatapplication.presentation.components.CustomBottomSheet
-import com.aarav.chatapplication.ui.theme.hankenGrotesk
 import com.aarav.chatapplication.utils.formatTime
 import kotlinx.coroutines.delay
 import org.webrtc.EglBase
+import org.webrtc.PeerConnection
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoTrack
@@ -98,7 +102,9 @@ fun GroupCallScreen(
 
     val availableUsers by viewModel.availableUsers.collectAsState()
 
-    val selectedUsers = remember { mutableStateListOf<String>() }
+    val peerStates by viewModel.peerStates.collectAsState()
+    
+    val activeParticipants by viewModel.activeParticipants.collectAsState()
 
     val callEnded by viewModel.callEnded.collectAsState()
     val isMuted by viewModel.isMuted.collectAsState()
@@ -109,10 +115,11 @@ fun GroupCallScreen(
 
 
     val isVideoEnabled by viewModel.isVideoEnabled.collectAsState()
+    val mediaStates by viewModel.mediaStates.collectAsState()
+    val userNames by viewModel.usersMapping.collectAsState()
 
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -253,7 +260,7 @@ fun GroupCallScreen(
     }
 
 
-    if(showSheet) {
+    if (showSheet) {
         CustomBottomSheet(
             sheetState = sheetState,
             onDismiss = {
@@ -276,7 +283,7 @@ fun GroupCallScreen(
 
 
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = Color(0xFF121212),
         modifier = Modifier.fillMaxSize()
     ) {
 
@@ -289,15 +296,18 @@ fun GroupCallScreen(
 
 
             if (eglBaseContext != null) {
-                key(tracks.size) {
-                    SmartVideoGrid(
-                        tracks,
-                        isVideoEnabled,
-                        myUserId,
-                        context,
-                        eglBaseContext!!
-                    )
-                }
+                SmartVideoGrid(
+                    tracks = tracks,
+                    isVideoCall = isVideoCall,
+                    connectionState = peerStates,
+                    isLocalVideoEnabled = isVideoEnabled,
+                    myUserId = myUserId,
+                    context = context,
+                    eglBaseContext = eglBaseContext!!,
+                    mediaStates = mediaStates,
+                    userNames = userNames,
+                    activeParticipants = activeParticipants
+                )
             }
 
 //            AndroidView(
@@ -349,11 +359,11 @@ fun GroupCallScreen(
                             "CONNECTED" -> "Connected"
                             "DISCONNECTED" -> "Disconnected"
                             "FAILED" -> "Failed"
-                            "CLOSED", "ENDED" -> "GroupCall Ended"
+                            "CLOSED", "ENDED" -> "Group Call Ended"
                             "BUSY" -> "User is Busy"
                             "REJECTED" -> "GroupCall Declined"
                             "MISSED" -> "Missed GroupCall"
-                            "IDLE" -> if (callEnded) "GroupCall Ended" else "Initializing..."
+                            "IDLE" -> if (callEnded) "Group Call Ended" else "Initializing..."
                             else -> "Initializing..."
                         },
                         color = Color.White,
@@ -703,16 +713,40 @@ fun IncomingCallBanner(
 @Composable
 fun SmartVideoGrid(
     tracks: Map<String, VideoTrack>,
+    isVideoCall: Boolean,
+    connectionState: Map<String, PeerConnection.PeerConnectionState>,
     isLocalVideoEnabled: Boolean,
     myUserId: String,
     context: Context,
-    eglBaseContext: EglBase.Context
+    eglBaseContext: EglBase.Context,
+    mediaStates: Map<String, com.aarav.chatapplication.data.model.MediaState>,
+    userNames: Map<String, String>,
+    activeParticipants: Set<String>
 ) {
 
-    val users = tracks.entries.toList().sortedBy { it.key }
+    val participantIds = activeParticipants.filter {
+        it == myUserId || mediaStates.containsKey(it) || connectionState[it] == PeerConnection.PeerConnectionState.CONNECTED
+    }.toMutableSet()
+    
+    if (!participantIds.contains(myUserId)) {
+        participantIds.add(myUserId)
+    }
+    
+    val users = mutableListOf<Pair<String, VideoTrack?>>()
+    
+    users.add(myUserId to (tracks["LOCAL"] ?: tracks[myUserId]))
+    participantIds.remove(myUserId)
+    
+    participantIds.sorted().forEach { userId ->
+        users.add(userId to tracks[userId])
+    }
+
     val count = users.size
-    val columns = kotlin.math.ceil(kotlin.math.sqrt(count.toDouble())).toInt()
-    val rows = kotlin.math.ceil(count / columns.toDouble()).toInt()
+
+    val columns = if (count == 0) 1 else kotlin.math.ceil(kotlin.math.sqrt(count.toDouble())).toInt()
+    val rows = if (count == 0) 1 else kotlin.math.ceil(count / columns.toDouble()).toInt()
+
+
 
     when (count) {
 
@@ -724,12 +758,16 @@ fun SmartVideoGrid(
 
         1 -> {
             VideoItem(
-                users[0].value,
+                track = users[0].second,
+                isVideoCall,
+                connectionState[users[0].first],
                 isLocalVideoEnabled,
-                users[0].key,
+                users[0].first,
                 myUserId,
                 context,
                 eglBaseContext,
+                mediaStates[users[0].first],
+                userNames[users[0].first] ?: users[0].first,
                 Modifier.fillMaxSize()
             )
         }
@@ -738,104 +776,16 @@ fun SmartVideoGrid(
             Column(Modifier.fillMaxSize()) {
                 users.forEach {
                     VideoItem(
-                        it.value,
+                        it.second,
+                        isVideoCall,
+                        connectionState[it.first],
                         isLocalVideoEnabled,
-                        it.key,
+                        it.first,
                         myUserId,
                         context,
                         eglBaseContext,
-                        Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        else -> {
-            Column(Modifier.fillMaxSize()) {
-
-                var index = 0
-
-                repeat(rows) { rowIndex ->
-
-                    val remaining = count - index
-                    val itemsInThisRow = if (rowIndex == rows - 1) {
-                        remaining
-                    } else {
-                        columns
-                    }
-
-                    Row(
-                        modifier = Modifier.weight(1f)
-                    ) {
-
-                        repeat(itemsInThisRow) {
-
-                            val user = users[index]
-
-                            VideoItem(
-                                track = user.value,
-                                isLocalVideoEnabled = isLocalVideoEnabled,
-                                userId = user.key,
-                                myUserId = myUserId,
-                                context = context,
-                                eglBaseContext = eglBaseContext,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                            )
-
-                            index++
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-
-}
-
-@Composable
-fun VideoGrid(
-    tracks: Map<String, VideoTrack>,
-    isLocalVideoEnabled: Boolean,
-    myUserId: String,
-    context: Context,
-    eglBaseContext: EglBase.Context
-) {
-    val users = tracks.entries.toList()
-
-    Log.d("VIDEO", "size: ${users.size}")
-
-    when (users.size) {
-        0 -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Waiting for users...")
-            }
-        }
-
-        1 -> {
-            VideoItem(
-                users[0].value,
-                isLocalVideoEnabled,
-                users[0].key,
-                myUserId,
-                context,
-                eglBaseContext,
-                Modifier.fillMaxSize()
-            )
-        }
-
-        2 -> {
-            Column(Modifier.fillMaxSize()) {
-                users.forEach {
-                    VideoItem(
-                        it.value,
-                        isLocalVideoEnabled,
-                        it.key,
-                        myUserId,
-                        context,
-                        eglBaseContext,
+                        mediaStates[it.first],
+                        userNames[it.first] ?: it.first,
                         Modifier.weight(1f)
                     )
                 }
@@ -844,94 +794,132 @@ fun VideoGrid(
 
         else -> {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(columns),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(users) {
-                    VideoItem(
-                        it.value,
-                        isLocalVideoEnabled,
-                        it.key,
-                        myUserId,
-                        context,
-                        eglBaseContext,
-                        Modifier.aspectRatio(1f)
-                    )
+                items(
+                    items = users,
+                    key = { it.first },
+                    span = { user ->
+
+                        val isLastOdd =
+                            (count % columns != 0) &&
+                                    (user == users.last())
+
+                        if (isLastOdd) {
+                            GridItemSpan(columns)
+                        } else {
+                            GridItemSpan(1)
+                        }
+                    }
+                ) { user ->
+
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateContentSize(
+                                    animationSpec = tween(400)
+                                )
+                        ) {
+                            VideoItem(
+                                track = user.second,
+                                isVideoCall = isVideoCall,
+                                connectionState = connectionState[user.first],
+                                isLocalVideoEnabled = isLocalVideoEnabled,
+                                userId = user.first,
+                                myUserId = myUserId,
+                                context = context,
+                                eglBaseContext = eglBaseContext,
+                                mediaState = mediaStates[user.first],
+                                userName = userNames[user.first] ?: user.first,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+
 }
 
 
 @Composable
 fun VideoItem(
-    track: VideoTrack,
+    track: VideoTrack?,
+    isVideoCall: Boolean,
+    connectionState: PeerConnection.PeerConnectionState?,
     isLocalVideoEnabled: Boolean,
     userId: String,
     myUserId: String,
     context: Context,
     eglBaseContext: EglBase.Context,
+    mediaState: com.aarav.chatapplication.data.model.MediaState?,
+    userName: String,
     modifier: Modifier = Modifier
 ) {
 
-
-    // val isLocal = userId == myUserId
     val isLocal = userId == myUserId || userId == "LOCAL"
+    val isVideoEnabledForUser =
+        if (isLocal) isLocalVideoEnabled
+        else (mediaState?.videoEnabled ?: true)
 
-    val view = remember(eglBaseContext) {
-        SurfaceViewRenderer(context)
-    }
-
-
-    DisposableEffect(eglBaseContext) {
-
-        view.init(eglBaseContext, null)
-        view.setMirror(isLocal)
-        view.setZOrderMediaOverlay(true)
-        view.setEnableHardwareScaler(true)
-
-        view.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
-
-        onDispose {
-            track.removeSink(view)
-            view.release()
-        }
-
-    }
+    val isMuted = mediaState?.muted ?: false
+    val hasTrack = track != null
+    val showVideo = isVideoCall && isVideoEnabledForUser && hasTrack
 
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .padding(4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF2C2C2C))
     ) {
-        if (isLocal && !isLocalVideoEnabled) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        painter = painterResource(R.drawable.camera_off),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "You",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
+        if (showVideo) {
+            val view = remember(eglBaseContext) {
+                SurfaceViewRenderer(context).apply {
+                    clipToOutline = true
+                    outlineProvider = object : android.view.ViewOutlineProvider() {
+                        override fun getOutline(
+                            view: android.view.View,
+                            outline: android.graphics.Outline
+                        ) {
+                            outline.setRoundRect(
+                                0,
+                                0,
+                                view.width,
+                                view.height,
+                                16f * context.resources.displayMetrics.density
+                            )
+                        }
+                    }
+                    addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                        v.invalidateOutline()
+                    }
                 }
             }
-        } else {
+
+            DisposableEffect(eglBaseContext) {
+                view.init(eglBaseContext, null)
+                view.setMirror(isLocal)
+                view.setZOrderMediaOverlay(true)
+                view.setEnableHardwareScaler(true)
+                view.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+
+                onDispose {
+                    track?.removeSink(view)
+                    view.release()
+                }
+            }
+
             AndroidView(
-                modifier = modifier.fillMaxSize(),
-                factory = {
-                    view
-                },
+                modifier = Modifier.fillMaxSize(),
+                factory = { view },
                 update = {
                     try {
                         Log.d("VIDEO", "Rendering track for $userId")
@@ -942,36 +930,89 @@ fun VideoItem(
                     }
                 }
             )
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = (if (isLocal) "You" else userName).take(1).uppercase(),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
+        Box(
+            modifier = Modifier.align(Alignment.Center),
+            contentAlignment = Alignment.Center
+        ) {
+            when (connectionState) {
+                PeerConnection.PeerConnectionState.CONNECTING -> {
+                    Text(
+                        "Connecting...",
+                        color = Color.White,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    )
+                }
+                PeerConnection.PeerConnectionState.FAILED -> {
+                    Text(
+                        "Reconnecting...",
+                        color = Color.Red,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    )
+                }
+                else -> Unit
+            }
+        }
 
-        Text(
-            text = if (isLocal) "You" else userId,
-            color = Color.White,
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(8.dp)
-        )
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isLocal) "You" else userName,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (isMuted) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    painter = painterResource(R.drawable.microphone_off),
+                    contentDescription = "Muted",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            if (isVideoCall && !showVideo) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    painter = painterResource(R.drawable.camera_off),
+                    contentDescription = "Camera Off",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
-
-//@Composable
-//fun LocalPreview(
-//    localTrack: VideoTrack
-//) {
-//    Box(
-//        modifier = Modifier
-//            .size(120.dp)
-//            .clip(RoundedCornerShape(16.dp))
-//    ) {
-//        AndroidView(
-//            factory = { context ->
-//                SurfaceViewRenderer(context).apply {
-//                    init(EglBase.create().eglBaseContext, null)
-//                    setMirror(true)
-//                    localTrack.addSink(this)
-//                }
-//            }
-//        )
-//    }
-//}

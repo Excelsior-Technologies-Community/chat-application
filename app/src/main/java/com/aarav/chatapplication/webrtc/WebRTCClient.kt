@@ -43,6 +43,11 @@ class WebRTCClient
 
     private val connectedPeers = mutableSetOf<String>()
 
+    private val _peerStates =
+        MutableStateFlow<Map<String, PeerConnection.PeerConnectionState>>(emptyMap())
+
+    val peerStates = _peerStates.asStateFlow()
+
     private val _iceCandidateFlow = MutableSharedFlow<Pair<IceCandidate, String>>(
         replay = 10
     )
@@ -196,8 +201,13 @@ class WebRTCClient
         override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
         override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {}
 
-        override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
+        override fun onConnectionChange(newState: PeerConnection.PeerConnectionState) {
             Log.i("MESH", "[$userId] PeerConnection state → $newState")
+
+            _peerStates.value = _peerStates.value.toMutableMap().apply {
+                put(userId, newState)
+            }
+
             when (newState) {
                 PeerConnection.PeerConnectionState.CONNECTED -> {
                     if (connectedPeers.add(userId)) {
@@ -573,6 +583,7 @@ class WebRTCClient
             pendingIceCandidates.clear()
             remoteDescriptionSet.clear()
             connectedPeers.clear()
+            _peerStates.value = emptyMap()
             remoteAudioTracks.clear()
             _connectionState.value = "NEW"
             _allTracks.value = _allTracks.value.filterKeys { it == "LOCAL" }
@@ -611,6 +622,11 @@ class WebRTCClient
                 Log.e("CALL", "Failed to remove PC for $userId", e)
             }
         }
+
+        _peerStates.value = _peerStates.value.toMutableMap().apply {
+            remove(userId)
+        }
+
         pendingIceCandidates.remove(userId)
         remoteDescriptionSet.remove(userId)
         remoteAudioTracks.remove(userId)

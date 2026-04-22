@@ -113,7 +113,6 @@ class HomeScreenVM
 
         viewModelScope.launch {
             chatListRepository.observeUserChats(myId)
-                .timeout(10.seconds)
                 .catch { e ->
                     Log.i("CATCH", e.message.toString())
                     _uiState.update {
