@@ -31,5 +31,6 @@ sealed class NavRoute(val path: String) {
     }
 
     object Profile: NavRoute("profile")
+    object CallHistory: NavRoute("call_history")
     object Auth: NavRoute("auth")
 }

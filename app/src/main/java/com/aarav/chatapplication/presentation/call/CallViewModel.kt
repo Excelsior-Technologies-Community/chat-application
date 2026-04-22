@@ -1,6 +1,5 @@
 package com.aarav.chatapplication.presentation.call
 
-import android.media.AudioManager
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,37 +9,26 @@ import com.aarav.chatapplication.data.model.IceCandidateModel
 import com.aarav.chatapplication.data.model.OfferModel
 import com.aarav.chatapplication.data.model.MediaState
 import com.aarav.chatapplication.domain.model.User
-import com.aarav.chatapplication.domain.repository.ChatListRepository
-import com.aarav.chatapplication.domain.repository.GroupChatRepository
 import com.aarav.chatapplication.domain.repository.UserRepository
-import com.aarav.chatapplication.presentation.model.DirectChatEntry
-import com.aarav.chatapplication.presentation.model.GroupChatEntry
+import com.aarav.chatapplication.domain.repository.CallHistoryRepository
 import com.aarav.chatapplication.webrtc.CallStateManager
 import com.aarav.chatapplication.webrtc.SignalingClient
 import com.aarav.chatapplication.webrtc.WebRTCClient
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.timeout
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.webrtc.PeerConnection
-import org.webrtc.VideoTrack
 import javax.inject.Inject
 import kotlin.Boolean
-import kotlin.Pair
 import kotlin.String
 import kotlin.collections.listOf
-import kotlin.collections.mutableMapOf
 import kotlin.collections.mutableSetOf
-import kotlin.time.Duration.Companion.seconds
 
 private const val TAG = "CONNECTION"
 
@@ -49,10 +37,13 @@ class CallViewModel @Inject constructor(
     private val signalingClient: SignalingClient,
     private val webRTCClient: WebRTCClient,
     private val callStateManager: CallStateManager,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val callHistoryRepository: CallHistoryRepository
 ) : ViewModel() {
 
     private var isCaller = false
+    private var activeIsGroupCall = false
+    private var activeIsVideoCall = false
 
     private val handledOfferKeys = mutableSetOf<String>()
     private val handledAnswerKeys = mutableSetOf<String>()
@@ -190,13 +181,14 @@ class CallViewModel @Inject constructor(
     fun startCall(call: CallModel, myUserId: String) {
         this.myUserId = myUserId
         isCaller = true
+        activeIsGroupCall = call.groupCall
+        activeIsVideoCall = call.videoCall
         resetState()
 
         activeCallId = call.callId
         callStateManager.activeCallId = call.callId
         activeCallerId = call.callerId
         activeReceiverId = call.participants.keys.firstOrNull { it != myUserId } ?: ""
-        //activeReceiverId = call.participants.firstOrNull { it != myUserId } ?: ""
         _activeParticipants.update { setOf(myUserId) }
         Log.d(TAG, "[$myUserId] STARTING CALL ${call.callId} | participants=${call.participants}")
 
@@ -211,16 +203,8 @@ class CallViewModel @Inject constructor(
             }
             updateMyMediaState()
 
-            //_localVideoTrack.value = webRTCClient.localVideoTrack
 
             signalingClient.createCall(call)
-
-//            val others = call.participants.filter { it != myUserId }
-//            others.forEach { userId -> enqueue(userId) }
-
-//            val others = call.participants.keys.filter { it != myUserId }
-//            Log.d(TAG, "[$myUserId] Will send offers to: $others")
-//            others.forEach { enqueue(it) }
 
             startObservers(call.callId)
         }
@@ -257,7 +241,6 @@ class CallViewModel @Inject constructor(
             }
             updateMyMediaState()
 
-            //_localVideoTrack.value = webRTCClient.localVideoTrack
             startObservers(callId)
         }
     }
@@ -353,20 +336,7 @@ class CallViewModel @Inject constructor(
                 }
 
                 _mediaStates.value = call.mediaStates
-//
-//                // MESH: discover new participants and decide who offers
-//                call.participants.forEach { peerId ->
-//                    if (peerId == myUserId) return@forEach
-//                    if (peerCreated.contains(peerId)) return@forEach
-//
-//                    val iAmInitiator = isCaller || myUserId < peerId
-//                    if (iAmInitiator) {
-//                        Log.d(TAG, "[$myUserId] Mesh: I should offer to $peerId (isCaller=$isCaller, myId<peerId=${myUserId < peerId})")
-//                        enqueue(peerId)
-//                    } else {
-//                        Log.d(TAG, "[$myUserId] Mesh: waiting for $peerId to offer to me")
-//                    }
-//                }
+
 
                 // OFFERS: process offers addressed to me
                 call.offers.forEach { (key, offer) ->
@@ -382,8 +352,6 @@ class CallViewModel @Inject constructor(
                         isAnswered = true
                         timeoutJob?.cancel()
                     }
-                    //callStateManager.updateState("CONNECTING")
-
                     ensurePeerConnection(senderId)
 
                     webRTCClient.onRemoteOfferReceived(senderId, offer.sdp) { answer ->
@@ -414,7 +382,6 @@ class CallViewModel @Inject constructor(
                         isAnswered = true
                         timeoutJob?.cancel()
                     }
-                    //callStateManager.updateState("CONNECTING")
 
                     webRTCClient.onAnswerReceived(senderId, answer)
                 }
@@ -505,12 +472,6 @@ class CallViewModel @Inject constructor(
         }
         updateMyMediaState()
     }
-
-//        activeCallId?.let { id ->
-//            viewModelScope.launch {
-//                signalingClient.updateRemoteVideoState(id, isCaller, newState)
-//            }
-//        }
 
     fun refreshAudio() {
         webRTCClient.enableAllAudio()
@@ -657,17 +618,30 @@ class CallViewModel @Inject constructor(
 
     private fun saveHistoryIfNeeded(finalStatus: String) {
         if (!isCaller) return
-        if (activeCallerId.isEmpty() || activeReceiverId.isEmpty()) return
+        if (activeCallerId.isEmpty()) return
+
+        val participantsMap = _activeParticipants.value.associateWith { true }.toMutableMap()
+        if (participantsMap.isEmpty()) {
+            if (activeReceiverId.isNotEmpty()) {
+                participantsMap[activeCallerId] = true
+                participantsMap[activeReceiverId] = true
+            } else {
+                participantsMap[activeCallerId] = true
+            }
+        }
 
         val history = CallHistoryModel(
             callerId = activeCallerId,
             receiverId = activeReceiverId,
+            participants = participantsMap,
+            groupCall = activeIsGroupCall,
+            videoCall = activeIsVideoCall,
             duration = _callTime.value.toLong(),
             status = finalStatus
         )
         viewModelScope.launch {
             try {
-                signalingClient.saveCallHistory(history)
+                callHistoryRepository.saveCallHistory(history)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save history", e)
             }

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -26,7 +27,7 @@ fun BottomNavigation(navController: NavController) {
     val currentRoute = navBackStackEntry?.destination?.route
 
 
-    val navItems = listOf(NavItem.Chat, NavItem.Profile)
+    val navItems = listOf(NavItem.Chat, NavItem.CallHistory, NavItem.Profile)
 
     NavigationBar(
         tonalElevation = 4.dp,
@@ -63,6 +64,7 @@ fun BottomNavigation(navController: NavController) {
                     Image(
                         painter = painterResource(item.icon),
                         contentDescription = "nav icon",
+                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimaryContainer),
                         modifier = Modifier.size(24.dp)
                     )
                 },

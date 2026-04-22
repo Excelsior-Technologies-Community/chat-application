@@ -25,8 +25,6 @@ class MainVM
 ) : ViewModel() {
     private val _incomingCall = MutableStateFlow<CallModel?>(null)
     val incomingCall = _incomingCall.asStateFlow()
-    private val _callEnded = MutableSharedFlow<String>()
-    val callEnded = _callEnded.asSharedFlow()
 
 
     fun listenForIncomingCalls(userId: String) {
@@ -61,29 +59,6 @@ class MainVM
                     } else {
                         _incomingCall.value = null
                     }
-
-//                    val myHandshakeKey = call.offers.keys.find { it.endsWith("_$userId") }
-//                    val myOffer = if (myHandshakeKey != null) call.offers[myHandshakeKey] else null
-//
-//                    val myAnswerKey = call.answers.keys.find { it.endsWith("_$userId") }
-//                    val myAnswer = if (myAnswerKey != null) call.answers[myAnswerKey] else null
-//
-//                    if (myOffer != null && myAnswer == null) {
-//
-//                        val isBusy =
-//                            callStateManager.callState.value != "IDLE" &&
-//                                    call.callId != callStateManager.activeCallId
-//
-//                        if (isBusy) {
-//                            signalingClient.setBusy(call.callId)
-//                        } else {
-//                            _incomingCall.value = call
-//                        }
-//
-//                    } else {
-//                        _incomingCall.value = null
-//                    }
-//                }
                 }
         }
     }

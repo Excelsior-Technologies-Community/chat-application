@@ -159,10 +159,8 @@ class WebRTCClient
             return
         }
 
-        //createAudioTrack()
 
         localAudioTrack?.let { pc.addTrack(it, streamIds) }
-        //localAudioTrack?.setEnabled(true)
         localVideoTrack?.let { pc.addTrack(it, streamIds) }
 
         peerConnections[userId] = pc
@@ -368,8 +366,6 @@ class WebRTCClient
         } catch (e: Exception) {
             Log.e(TAG, "stopCapture error", e)
         }
-//        videoCapturer?.dispose()
-//        videoCapturer = null
     }
 
     fun toggleMute(isMuted: Boolean) {
@@ -633,7 +629,6 @@ class WebRTCClient
         _allTracks.value = _allTracks.value
             .filterKeys { it != userId }
             .toMap()
-        //_allTracks.value = _allTracks.value.toMutableMap().apply { remove(userId) }
     }
 
     private fun applyBufferedIceCandidates(userId: String) {

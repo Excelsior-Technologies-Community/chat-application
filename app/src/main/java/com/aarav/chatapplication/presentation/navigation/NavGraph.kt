@@ -21,6 +21,7 @@ import com.aarav.chatapplication.presentation.group.CreateGroupScreen
 import com.aarav.chatapplication.presentation.group.GroupChatScreen
 import com.aarav.chatapplication.presentation.home.HomeScreen
 import com.aarav.chatapplication.presentation.profile.ProfileScreen
+import com.aarav.chatapplication.presentation.call_history.CallHistoryScreen
 import com.aarav.chatapplication.utils.generateChatId
 
 @Composable
@@ -46,6 +47,7 @@ fun NavGraph(
         addOneToOneCallScreen(navHostController, this, callViewModel)
         addAuthScreen(navHostController, this)
         addProfileScreen(navHostController, this)
+        addCallHistoryScreen(navHostController, this)
     }
 }
 
@@ -108,6 +110,16 @@ fun addProfileScreen(navController: NavController, navGraphBuilder: NavGraphBuil
     ) {
         ProfileScreen(
             navController
+        )
+    }
+}
+
+fun addCallHistoryScreen(navController: NavController, navGraphBuilder: NavGraphBuilder) {
+    navGraphBuilder.composable(
+        route = NavRoute.CallHistory.path
+    ) {
+        CallHistoryScreen(
+            navController = navController
         )
     }
 }
@@ -234,20 +246,20 @@ fun addGroupCallScreen(
     callViewModel: CallViewModel
 ) {
     navGraphBuilder.composable(
-        route = NavRoute.GroupCall.path.plus("/{callId}/{myUserId}/{callerName}/{isCaller}/{isVideoCall}"),
+        route = NavRoute.GroupCall.path.plus("/{callId}/{myUserId}/{callerName}/{isCaller}/{videoCall}"),
         arguments = listOf(
             navArgument("callId") { type = NavType.StringType },
             navArgument("myUserId") { type = NavType.StringType },
             navArgument("callerName") { type = NavType.StringType },
             navArgument("isCaller") { type = NavType.BoolType },
-            navArgument("isVideoCall") { type = NavType.BoolType }
+            navArgument("videoCall") { type = NavType.BoolType }
         )
     ) {
         val groupId = it.arguments?.getString("callId").toString()
         val myUserId = it.arguments?.getString("myUserId").toString()
         val callerName = it.arguments?.getString("callerName").toString()
         val senderName = it.arguments?.getBoolean("isCaller")
-        val isVideoCall = it.arguments?.getBoolean("isVideoCall")
+        val isVideoCall = it.arguments?.getBoolean("videoCall")
 
         GroupCallScreen(
             callId = groupId,
@@ -270,20 +282,20 @@ fun addOneToOneCallScreen(
     callViewModel: CallViewModel
 ) {
     navGraphBuilder.composable(
-        route = NavRoute.OneToOne.path.plus("/{callId}/{myUserId}/{callerName}/{isCaller}/{isVideoCall}"),
+        route = NavRoute.OneToOne.path.plus("/{callId}/{myUserId}/{callerName}/{isCaller}/{videoCall}"),
         arguments = listOf(
             navArgument("callId") { type = NavType.StringType },
             navArgument("myUserId") { type = NavType.StringType },
             navArgument("callerName") { type = NavType.StringType },
             navArgument("isCaller") { type = NavType.BoolType },
-            navArgument("isVideoCall") { type = NavType.BoolType }
+            navArgument("videoCall") { type = NavType.BoolType }
         )
     ) {
         val callId = it.arguments?.getString("callId").toString()
         val myUserId = it.arguments?.getString("myUserId").toString()
         val callerName = it.arguments?.getString("callerName").toString()
         val isCaller = it.arguments?.getBoolean("isCaller")
-        val isVideoCall = it.arguments?.getBoolean("isVideoCall")
+        val isVideoCall = it.arguments?.getBoolean("videoCall")
 
         OneToOneCallScreen(
             callId = callId,

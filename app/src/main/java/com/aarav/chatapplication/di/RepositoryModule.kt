@@ -16,6 +16,8 @@ import com.aarav.chatapplication.domain.repository.MessageRepository
 import com.aarav.chatapplication.domain.repository.PresenceRepository
 import com.aarav.chatapplication.domain.repository.TypingRepository
 import com.aarav.chatapplication.domain.repository.UserRepository
+import com.aarav.chatapplication.data.repository.CallHistoryRepositoryImpl
+import com.aarav.chatapplication.domain.repository.CallHistoryRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -64,4 +66,9 @@ abstract class RepositoryModule {
     abstract fun bindGroupChatRepository(
         groupChatRepositoryImpl: GroupChatRepositoryImpl
     ): GroupChatRepository
+
+    @Binds
+    abstract fun bindCallHistoryRepository(
+        callHistoryRepositoryImpl: CallHistoryRepositoryImpl
+    ): CallHistoryRepository
 }

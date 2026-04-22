@@ -30,6 +30,9 @@ data class CallHistoryModel(
     val historyId: String = "",
     val callerId: String = "",
     val receiverId: String = "",
+    val participants: Map<String, Boolean> = emptyMap(),
+    val groupCall: Boolean = false,
+    val videoCall: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
     val duration: Long = 0,
     val status: String = ""
