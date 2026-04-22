@@ -25,14 +25,15 @@ import com.aarav.chatapplication.presentation.chat.formatTimestamp
 import com.aarav.chatapplication.presentation.navigation.BottomNavigation
 import com.aarav.chatapplication.ui.theme.hankenGrotesk
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CallHistoryScreen(
     navController: NavController,
-    viewModel: CallHistoryViewModel = hiltViewModel()
+    viewModel: CallHistoryViewModel
 ) {
     val history by viewModel.callHistory.collectAsState()
     val usersMapping by viewModel.usersMapping.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val currentUserId = viewModel.currentUserId
 
     Scaffold(
@@ -53,27 +54,41 @@ fun CallHistoryScreen(
             BottomNavigation(navController)
         }
     ) { paddingValues ->
-        if (history.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No past calls", color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LoadingIndicator()
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                items(history) { call ->
-                    CallHistoryItem(
-                        call = call,
-                        currentUserId = currentUserId ?: "",
-                        usersMapping = usersMapping
-                    )
+
+            history.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No past calls", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    items(history) { call ->
+                        CallHistoryItem(
+                            call = call,
+                            currentUserId = currentUserId ?: "",
+                            usersMapping = usersMapping
+                        )
+                    }
                 }
             }
         }

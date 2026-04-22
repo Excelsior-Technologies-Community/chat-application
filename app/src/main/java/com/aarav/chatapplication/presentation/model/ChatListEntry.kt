@@ -14,7 +14,7 @@ data class DirectChatEntry(
     override val lastMessage: String,
     override val lastTimestamp: Long,
     override val unreadCount: Int,
-    val isOnline: Boolean
+    val online: Boolean
 ) : ChatListEntry
 
 data class GroupChatEntry(

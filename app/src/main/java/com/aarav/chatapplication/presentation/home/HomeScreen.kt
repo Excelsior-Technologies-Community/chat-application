@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +26,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -271,7 +274,7 @@ fun HomeScreen(
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                     ) {
                         Text(
                             "Recents",
@@ -317,114 +320,108 @@ fun DirectChatItem(
     entry: DirectChatEntry,
     onClick: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clickable {
-                onClick()
-            },
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Box {
             Surface(
-                modifier = Modifier.size(67.dp),
+                modifier = Modifier.size(54.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Image(
-                    painter = painterResource(R.drawable.user),
-                    contentDescription = "avatar",
-                    modifier = Modifier
-                        .size(36.dp)
-                        .padding(8.dp)
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = entry.otherUserName.take(1).uppercase(),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = hankenGrotesk,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            
+//            if (entry.online) {
+//                Surface(
+//                    modifier = Modifier
+//                        .size(14.dp)
+//                        .align(Alignment.BottomEnd),
+//                    shape = CircleShape,
+//                    color = MaterialTheme.colorScheme.surface,
+//                ) {
+//                    Box(
+//                        modifier = Modifier
+//                            .padding(2.dp)
+//                            .size(10.dp)
+//                            .background(Color(0xFF00FF85), CircleShape)
+//                    )
+//                }
+//            }
+        }
+
+        Spacer(Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = entry.otherUserName,
+                    fontFamily = hankenGrotesk,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Text(
+                    text = formatTimestamp(entry.lastTimestamp),
+                    fontFamily = hankenGrotesk,
+                    fontSize = 12.sp,
+                    color = if (entry.unreadCount > 0)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .padding(start = 16.dp)
-                    .weight(1f)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        entry.otherUserName,
-                        fontFamily = hankenGrotesk,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (entry.isOnline) {
-                        Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.height(4.dp))
 
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF00FF85),
-                            modifier = Modifier.size(8.dp)
-                        ) { }
-
-                        Spacer(Modifier.width(6.dp))
-
-                        Text(
-                            "Online",
-                            fontFamily = hankenGrotesk,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF00FF85)
-                        )
-                    }
-                }
-
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    entry.lastMessage,
+                    text = entry.lastMessage.ifEmpty { "No messages yet" },
                     fontFamily = hankenGrotesk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(start = 16.dp)
-            ) {
-                Text(
-                    formatTimestamp(entry.lastTimestamp),
-                    fontFamily = hankenGrotesk,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = if (entry.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (entry.unreadCount > 0)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
-
+                
                 if (entry.unreadCount > 0) {
+                    Spacer(Modifier.width(8.dp))
                     Surface(
                         shape = CircleShape,
-                        modifier = Modifier.size(22.dp),
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                entry.unreadCount.toString(),
+                                text = if (entry.unreadCount > 99) "99+" else entry.unreadCount.toString(),
                                 fontFamily = hankenGrotesk,
-                                fontSize = 14.sp,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -432,6 +429,11 @@ fun DirectChatItem(
             }
         }
     }
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 86.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        thickness = 0.5.dp
+    )
 }
 
 @Composable
@@ -439,118 +441,99 @@ fun GroupChatItem(
     entry: GroupChatEntry,
     onClick: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable {
-                onClick()
-            },
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // Group initial avatar
+        Surface(
+            modifier = Modifier.size(54.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.tertiaryContainer
         ) {
-            Surface(
-                modifier = Modifier.size(67.dp),
-                shape = CircleShape,
-                color = Color(0xFF6C63FF),
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.user),
-                    contentDescription = "group avatar",
-                    modifier = Modifier
-                        .size(36.dp)
-                        .padding(8.dp)
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = entry.groupName.take(1).uppercase(),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = hankenGrotesk,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
                 )
             }
+        }
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .padding(start = 16.dp)
-                    .weight(1f)
+        Spacer(Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        entry.groupName,
-                        fontFamily = hankenGrotesk,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                    ) {
-                        Text(
-                            "Group",
-                            fontFamily = hankenGrotesk,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                val displayMessage = if (entry.lastSenderName.isNotEmpty() && entry.lastMessage.isNotEmpty()) {
-                    "${entry.lastSenderName}: ${entry.lastMessage}"
-                } else entry.lastMessage.ifEmpty {
-                    "No messages yet"
-                }
-
                 Text(
-                    displayMessage,
+                    text = entry.groupName,
+                    fontFamily = hankenGrotesk,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                if (entry.lastTimestamp > 0) {
+                    Text(
+                        text = formatTimestamp(entry.lastTimestamp),
+                        fontFamily = hankenGrotesk,
+                        fontSize = 12.sp,
+                        color = if (entry.unreadCount > 0)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            val displayMessage = when {
+                entry.lastSenderName.isNotEmpty() && entry.lastMessage.isNotEmpty() ->
+                    "${entry.lastSenderName}: ${entry.lastMessage}"
+                entry.lastMessage.isNotEmpty() -> entry.lastMessage
+                else -> "No messages yet"
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = displayMessage,
                     fontFamily = hankenGrotesk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontWeight = if (entry.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (entry.unreadCount > 0)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(start = 16.dp)
-            ) {
-                if (entry.lastTimestamp > 0) {
-                    Text(
-                        formatTimestamp(entry.lastTimestamp),
-                        fontFamily = hankenGrotesk,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
+                
                 if (entry.unreadCount > 0) {
+                    Spacer(Modifier.width(8.dp))
                     Surface(
                         shape = CircleShape,
-                        modifier = Modifier.size(22.dp),
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                entry.unreadCount.toString(),
+                                text = if (entry.unreadCount > 99) "99+" else entry.unreadCount.toString(),
                                 fontFamily = hankenGrotesk,
-                                fontSize = 14.sp,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -558,4 +541,9 @@ fun GroupChatItem(
             }
         }
     }
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 86.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        thickness = 0.5.dp
+    )
 }

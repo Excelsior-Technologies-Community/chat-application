@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -109,7 +110,8 @@ fun addProfileScreen(navController: NavController, navGraphBuilder: NavGraphBuil
         route = NavRoute.Profile.path
     ) {
         ProfileScreen(
-            navController
+            navController,
+            viewModel = hiltViewModel()
         )
     }
 }
@@ -119,7 +121,8 @@ fun addCallHistoryScreen(navController: NavController, navGraphBuilder: NavGraph
         route = NavRoute.CallHistory.path
     ) {
         CallHistoryScreen(
-            navController = navController
+            navController = navController,
+            viewModel = hiltViewModel()
         )
     }
 }

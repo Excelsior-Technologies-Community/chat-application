@@ -163,17 +163,19 @@ fun ChatScreen(
                         Spacer(Modifier.width(8.dp))
 
                         Surface(
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(42.dp),
                             shape = CircleShape,
-                            color = Color(0xFF00DDC5),
+                            color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.user),
-                                contentDescription = "avatar",
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .padding(8.dp)
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = uiState.user?.name?.take(1)?.uppercase() ?: "?",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = hankenGrotesk,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
                         }
 
                         Column(

@@ -23,6 +23,10 @@ class CallHistoryViewModel @Inject constructor(
     private val _callHistory = MutableStateFlow<List<CallHistoryModel>>(emptyList())
     val callHistory = _callHistory.asStateFlow()
 
+
+    private val _isLoading = MutableStateFlow<Boolean>(false)
+    val isLoading = _isLoading.asStateFlow()
+
     private val _usersMapping = MutableStateFlow<Map<String, String>>(emptyMap())
     val usersMapping = _usersMapping.asStateFlow()
 
@@ -38,9 +42,13 @@ class CallHistoryViewModel @Inject constructor(
 
     private fun fetchHistory() {
         if (currentUserId == null) return
+
+        _isLoading.value = true
+
         viewModelScope.launch {
             callHistoryRepository.fetchCallHistory(currentUserId).collectLatest { histories ->
                 _callHistory.value = histories
+                _isLoading.value = false
             }
         }
     }

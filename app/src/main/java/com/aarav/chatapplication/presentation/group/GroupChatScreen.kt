@@ -154,17 +154,19 @@ fun GroupChatScreen(
                         Spacer(Modifier.width(8.dp))
 
                         Surface(
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(42.dp),
                             shape = CircleShape,
-                            color = Color(0xFF6C63FF)
+                            color = MaterialTheme.colorScheme.tertiaryContainer
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.user),
-                                contentDescription = "group avatar",
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .padding(8.dp)
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = uiState.group?.name?.take(1)?.uppercase() ?: "?",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = hankenGrotesk,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
                         }
 
                         Column(

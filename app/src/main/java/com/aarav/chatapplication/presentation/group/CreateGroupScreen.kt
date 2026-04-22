@@ -228,7 +228,7 @@ fun SelectableUserCard(
                 color = if (isSelected)
                     MaterialTheme.colorScheme.primary
                 else
-                    MaterialTheme.colorScheme.secondaryContainer
+                    MaterialTheme.colorScheme.tertiaryContainer
             ) {
                 Image(
                     painter = painterResource(R.drawable.user),

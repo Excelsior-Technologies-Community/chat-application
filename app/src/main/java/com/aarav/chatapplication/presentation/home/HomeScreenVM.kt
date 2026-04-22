@@ -3,7 +3,6 @@ package com.aarav.chatapplication.presentation.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.domain.model.User
 import com.aarav.chatapplication.domain.repository.AuthRepository
 import com.aarav.chatapplication.domain.repository.ChatListRepository
@@ -20,20 +19,15 @@ import com.aarav.chatapplication.webrtc.SignalingClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.timeout
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
 class HomeScreenVM
@@ -101,7 +95,6 @@ class HomeScreenVM
     fun observeChatList(myId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            delay(500)
 
             userRepository.findUserByUserId(myId)
                 .catch { }
@@ -146,7 +139,7 @@ class HomeScreenVM
                                 lastMessage = meta.first,
                                 lastTimestamp = meta.second,
                                 unreadCount = unread,
-                                isOnline = false
+                                online = false
                             ).also {
                                 markChatDeliveredIfNeeded(chatId, myId, unread)
                             }

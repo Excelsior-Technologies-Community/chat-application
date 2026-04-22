@@ -123,8 +123,8 @@ fun CreateChatUserCard(
         },
         shape = RoundedCornerShape (24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -140,12 +140,12 @@ fun CreateChatUserCard(
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
             ) {
                 Image(
                     painter = painterResource(R.drawable.user),
                     contentDescription = "avatar",
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.inverseSurface),
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.tertiaryContainer),
                     modifier = Modifier
                         .size(36.dp)
                         .padding(8.dp)
@@ -249,7 +249,7 @@ fun AddParticipantUserCard(
             containerColor = if (isSelected)
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
             else
-                MaterialTheme.colorScheme.secondaryContainer
+                MaterialTheme.colorScheme.tertiaryContainer
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -266,11 +266,12 @@ fun AddParticipantUserCard(
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
             ) {
                 Image(
                     painter = painterResource(R.drawable.user),
                     contentDescription = "avatar",
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.tertiaryContainer),
                     modifier = Modifier
                         .size(36.dp)
                         .padding(8.dp)
