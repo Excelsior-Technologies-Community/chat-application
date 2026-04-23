@@ -33,4 +33,16 @@ sealed class NavRoute(val path: String) {
     object Profile: NavRoute("profile")
     object CallHistory: NavRoute("call_history")
     object Auth: NavRoute("auth")
+
+    object GroupInfo: NavRoute("group_info") {
+        fun createRoute(groupId: String, currentUserId: String): String {
+            return "group_info/$groupId/$currentUserId"
+        }
+    }
+
+    object ChatInfo: NavRoute("chat_info") {
+        fun createRoute(userId: String): String {
+            return "chat_info/$userId"
+        }
+    }
 }

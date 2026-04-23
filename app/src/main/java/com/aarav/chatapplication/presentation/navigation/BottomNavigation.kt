@@ -1,6 +1,5 @@
 package com.aarav.chatapplication.presentation.navigation
 
-
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
@@ -25,7 +24,6 @@ import com.aarav.chatapplication.ui.theme.hankenGrotesk
 fun BottomNavigation(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-
 
     val navItems = listOf(NavItem.Chat, NavItem.CallHistory, NavItem.Profile)
 

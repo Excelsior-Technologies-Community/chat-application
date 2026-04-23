@@ -91,4 +91,45 @@ class GroupRepositoryImpl @Inject constructor(
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }
+
+    override suspend fun updateGroupName(groupId: String, newName: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("name").setValue(newName).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to update group name")
+        }
+    }
+
+    override suspend fun addMembers(groupId: String, memberIds: List<String>): Result<Unit> {
+        return try {
+            val updates = hashMapOf<String, Any>()
+            memberIds.forEach { userId ->
+                updates["${FirebasePaths.group(groupId)}/members/$userId"] = true
+                updates["${FirebasePaths.userGroups(userId)}/$groupId"] = true
+            }
+            rootRef.updateChildren(updates).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to add members")
+        }
+    }
+
+    override suspend fun removeMember(groupId: String, userId: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("members").child(userId).setValue(false).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to remove member")
+        }
+    }
+
+    override suspend fun leaveGroup(groupId: String, userId: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("members").child(userId).setValue(false).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to leave group")
+        }
+    }
 }

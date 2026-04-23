@@ -91,8 +91,7 @@ class CallViewModel @Inject constructor(
     val events = _events.receiveAsFlow()
 
     val tracks = webRTCClient.allTracks
-//    private val _localVideoTrack = MutableStateFlow<VideoTrack?>(null)
-//    val localVideoTrack = _localVideoTrack.asStateFlow()
+
     val eglContext = webRTCClient.eglContext
 
     private var connectionJob: Job? = null
@@ -102,7 +101,6 @@ class CallViewModel @Inject constructor(
     private var iceIncomingJob: Job? = null
     private var timerJob: Job? = null
     private var timeoutJob: Job? = null
-
 
     private val _isVideoEnabled = MutableStateFlow(false)
     val isVideoEnabled = _isVideoEnabled.asStateFlow()
@@ -116,7 +114,6 @@ class CallViewModel @Inject constructor(
             Log.d(TAG, "[$myUserId] Connected → $userId")
 
             isProcessing = false
-
 
             viewModelScope.launch {
                 delay(300)
@@ -203,7 +200,6 @@ class CallViewModel @Inject constructor(
             }
             updateMyMediaState()
 
-
             signalingClient.createCall(call)
 
             startObservers(call.callId)
@@ -233,7 +229,6 @@ class CallViewModel @Inject constructor(
 
         viewModelScope.launch {
             webRTCClient.init()
-
 
             if(isVideoCall) {
                 webRTCClient.startLocalVideo()
@@ -337,11 +332,9 @@ class CallViewModel @Inject constructor(
 
                 _mediaStates.value = call.mediaStates
 
-
-                // OFFERS: process offers addressed to me
                 call.offers.forEach { (key, offer) ->
                     if (!key.endsWith("_$myUserId")) return@forEach
-                    
+
                     val offerHash = "${key}_${offer.sdp.hashCode()}"
                     if (!handledOfferKeys.add(offerHash)) return@forEach
 
@@ -364,7 +357,6 @@ class CallViewModel @Inject constructor(
                     }
                 }
 
-                // ANSWERS: process answers addressed to me
                 call.answers.forEach { (key, answer) ->
                     val parts = key.split("_")
                     if (parts.size != 2) return@forEach
@@ -373,7 +365,7 @@ class CallViewModel @Inject constructor(
                     val receiverId = parts[1]
 
                     if (receiverId != myUserId) return@forEach
-                    
+
                     val answerHash = "${key}_${answer.hashCode()}"
                     if (!handledAnswerKeys.add(answerHash)) return@forEach
 
@@ -396,7 +388,6 @@ class CallViewModel @Inject constructor(
                 if (peerId == myUserId) return@collect
 
                 if (isJoin) {
-
 
                     _activeParticipants.update { it + peerId }
 
@@ -488,8 +479,8 @@ class CallViewModel @Inject constructor(
         activeCallId?.let { id ->
             viewModelScope.launch {
                 signalingClient.updateMediaState(
-                    id, 
-                    myUserId, 
+                    id,
+                    myUserId,
                     MediaState(muted = _isMuted.value, videoEnabled = _isVideoEnabled.value)
                 )
             }
@@ -614,7 +605,6 @@ class CallViewModel @Inject constructor(
             }
         }
     }
-
 
     private fun saveHistoryIfNeeded(finalStatus: String) {
         if (!isCaller) return

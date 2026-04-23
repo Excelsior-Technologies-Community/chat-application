@@ -95,7 +95,6 @@ private val darkScheme = darkColorScheme(
     surfaceContainerHighest = surfaceContainerHighestDark,
 )
 
-
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppTheme(
@@ -119,8 +118,6 @@ fun AppTheme(
         content = content
     )
 }
-
-
 
 val hankenGrotesk = FontFamily(
     Font(R.font.hanken_grotesk_thin, FontWeight.Thin),

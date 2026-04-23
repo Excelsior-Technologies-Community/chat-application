@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.aarav.chatapplication.R
 import com.aarav.chatapplication.presentation.components.AddParticipantsSheet
+import com.aarav.chatapplication.presentation.components.CallInfoSheet
 import com.aarav.chatapplication.presentation.components.CustomBottomSheet
 import com.aarav.chatapplication.utils.formatTime
 import kotlinx.coroutines.delay
@@ -103,7 +105,7 @@ fun GroupCallScreen(
     val availableUsers by viewModel.availableUsers.collectAsState()
 
     val peerStates by viewModel.peerStates.collectAsState()
-    
+
     val activeParticipants by viewModel.activeParticipants.collectAsState()
 
     val callEnded by viewModel.callEnded.collectAsState()
@@ -113,13 +115,14 @@ fun GroupCallScreen(
 
     val time by viewModel.callTime.collectAsState()
 
-
     val isVideoEnabled by viewModel.isVideoEnabled.collectAsState()
     val mediaStates by viewModel.mediaStates.collectAsState()
     val userNames by viewModel.usersMapping.collectAsState()
 
     var showSheet by remember { mutableStateOf(false) }
+    var showInfoSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val infoSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -136,13 +139,10 @@ fun GroupCallScreen(
             .build()
     } else null
 
-
-
     LaunchedEffect(callId) {
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         audioManager.isSpeakerphoneOn = isSpeakerOn
         audioManager.isMicrophoneMute = false
-
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.requestAudioFocus(focusRequest!!)
@@ -169,38 +169,6 @@ fun GroupCallScreen(
         audioManager.isSpeakerphoneOn = isSpeakerOn
     }
 
-//    LaunchedEffect(Unit) {
-//        val eglContext = viewModel.getEglContext()
-//
-//        remoteView.init(eglContext, null)
-//        remoteView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-//        remoteView.setZOrderOnTop(true)
-//        remoteView.setZOrderMediaOverlay(true)
-//        remoteView.setEnableHardwareScaler(true)
-//        remoteView.setZOrderMediaOverlay(false)
-//
-//        localView.init(eglContext, null)
-//        localView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-//        localView.setZOrderMediaOverlay(true)
-//        localView.setEnableHardwareScaler(true)
-//        localView.setZOrderMediaOverlay(true)
-//
-//        remoteView.setMirror(false)
-//        localView.setMirror(true)
-//    }
-
-//    LaunchedEffect(Unit) {
-//        viewModel.localVideoTrack.collect { track ->
-//            track?.let {
-//                it.setEnabled(true)
-//                it.addSink(localView)
-//            }
-//        }
-//    }
-//    LaunchedEffect(state) {
-//
-//    }
-
     LaunchedEffect(state) {
         if (state == "BUSY") {
             try {
@@ -213,30 +181,6 @@ fun GroupCallScreen(
             }
         }
     }
-
-//    LaunchedEffect(Unit) {
-//        viewModel.remoteVideoTrack.collect { track ->
-//
-//
-//            if (track == null) {
-//                remoteView.clearImage()
-//                return@collect
-//            }
-//
-//            videoReady = true
-//
-//            Log.d("CALL", "remote $track")
-//            track.setEnabled(true)
-//            track.addSink(remoteView)
-//        }
-//    }
-
-//    DisposableEffect(Unit) {
-//        onDispose {
-//            remoteView.release()
-//            localView.release()
-//        }
-//    }
 
     LaunchedEffect(Unit) {
 
@@ -259,7 +203,6 @@ fun GroupCallScreen(
         }
     }
 
-
     if (showSheet) {
         CustomBottomSheet(
             sheetState = sheetState,
@@ -280,7 +223,19 @@ fun GroupCallScreen(
         }
     }
 
-
+    if (showInfoSheet) {
+        CustomBottomSheet(
+            sheetState = infoSheetState,
+            onDismiss = { showInfoSheet = false },
+            title = "Call Info"
+        ) {
+            CallInfoSheet(
+                participants = userNames,
+                activeParticipants = activeParticipants,
+                onDismiss = { showInfoSheet = false }
+            )
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFF121212),
@@ -292,8 +247,6 @@ fun GroupCallScreen(
                 .fillMaxSize()
                 .padding(it)
         ) {
-//            val myUserId = if (isCaller) callerId else receiverId
-
 
             if (eglBaseContext != null) {
                 SmartVideoGrid(
@@ -310,38 +263,11 @@ fun GroupCallScreen(
                 )
             }
 
-//            AndroidView(
-//                factory = { remoteView },
-//                modifier = Modifier.fillMaxSize()
-//                    .alpha(videoAlpha)
-//            )
-//
-//            if (!videoReady) {
-//                Box(
-//                    modifier = Modifier
-//                        .fillMaxSize()
-//                        .background(Color.Black),
-//                    contentAlignment = Alignment.Center
-//                ) {
-//                    Text(callerName, color = Color.White, fontSize = 22.sp)
-//                }
-//            }
-//
-//            AndroidView(
-//                factory = { localView },
-//                modifier = Modifier
-//                    .padding(top = 78.dp)
-//                    .clip(RoundedCornerShape(16.dp))
-//                    .size(120.dp)
-//                    .align(Alignment.TopEnd)
-//                    .padding(horizontal = 16.dp)
-//            )
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .background(Color.Transparent) // optional blur feel
+                    .background(Color.Transparent)
                     .padding(horizontal = 12.dp, vertical = 12.dp),
             ) {
 
@@ -379,22 +305,42 @@ fun GroupCallScreen(
                     }
                 }
 
-                IconButton(
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.7f),
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    onClick = {
-                        viewModel.onAddParticipantClicked()
-                        showSheet = true
-                    },
-                    modifier = Modifier.align(Alignment.TopEnd)
+                Row(
+                    modifier = Modifier.align(Alignment.TopEnd),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.add_user),
-                        contentDescription = "Add Participant",
-                        modifier = Modifier.size(24.dp)
-                    )
+                    IconButton(
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.7f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        onClick = {
+                            showInfoSheet = true
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.user),
+                            contentDescription = "Call Info",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    IconButton(
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.7f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        onClick = {
+                            viewModel.onAddParticipantClicked()
+                            showSheet = true
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.add_user),
+                            contentDescription = "Add Participant",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
@@ -427,25 +373,6 @@ fun GroupCallScreen(
                 }
             )
 
-//            CallActionToolbar(
-//                modifier = Modifier
-//                    .align(Alignment.BottomCenter)
-//                    .padding(bottom = 54.dp),
-//                isMicEnabled = !isMuted,
-//                isSpeakerOn = isSpeakerOn,
-//                onMicClick = { viewModel.toggleMute() },
-//                onSpeakerClick = {
-//                    isSpeakerOn = !isSpeakerOn
-//                    audioManager.isSpeakerphoneOn = isSpeakerOn
-//                },
-//                onEndCallClick = {
-//                    viewModel.endCall(callId)
-//                },
-//                toggleCamera = {
-//                    viewModel.toggleCamera()
-//                }
-//            )
-
         }
     }
 }
@@ -477,7 +404,7 @@ fun CallActionToolbar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .padding(horizontal = 24.dp)
-//            .fillMaxWidth()
+
             .clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -496,7 +423,6 @@ fun CallActionToolbar(
                 )
             }
         }
-
 
         if (isVideoCall) {
             IconButton(
@@ -541,8 +467,6 @@ fun CallActionToolbar(
             )
         }
 
-
-
         VerticalDivider(
             color = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.height(32.dp)
@@ -560,7 +484,7 @@ fun CallActionToolbar(
                     onEndCallClick()
                 }
             },
-            // modifier = Modifier.size(24.dp)
+
         ) {
             Icon(
                 painter = painterResource(R.drawable.end_call),
@@ -590,7 +514,6 @@ fun IncomingCallBanner(
     }
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
 
     LaunchedEffect(Unit) {
 
@@ -727,26 +650,25 @@ fun SmartVideoGrid(
     val participantIds = activeParticipants.filter {
         it == myUserId || mediaStates.containsKey(it) || connectionState[it] == PeerConnection.PeerConnectionState.CONNECTED
     }.toMutableSet()
-    
+
     if (!participantIds.contains(myUserId)) {
         participantIds.add(myUserId)
     }
-    
+
     val users = mutableListOf<Pair<String, VideoTrack?>>()
-    
+
     users.add(myUserId to (tracks["LOCAL"] ?: tracks[myUserId]))
     participantIds.remove(myUserId)
-    
+
     participantIds.sorted().forEach { userId ->
         users.add(userId to tracks[userId])
     }
 
     val count = users.size
 
-    val columns = if (count == 0) 1 else kotlin.math.ceil(kotlin.math.sqrt(count.toDouble())).toInt()
+    val columns =
+        if (count == 0) 1 else kotlin.math.ceil(kotlin.math.sqrt(count.toDouble())).toInt()
     val rows = if (count == 0) 1 else kotlin.math.ceil(count / columns.toDouble()).toInt()
-
-
 
     when (count) {
 
@@ -793,39 +715,28 @@ fun SmartVideoGrid(
         }
 
         else -> {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(
-                    items = users,
-                    key = { it.first },
-                    span = { user ->
 
-                        val isLastOdd =
-                            (count % columns != 0) &&
-                                    (user == users.last())
+            Column(Modifier.fillMaxSize()) {
 
-                        if (isLastOdd) {
-                            GridItemSpan(columns)
-                        } else {
-                            GridItemSpan(1)
-                        }
+                var index = 0
+
+                repeat(rows) { rowIndex ->
+
+                    val remaining = count - index
+                    val itemsInThisRow = if (rowIndex == rows - 1) {
+                        remaining
+                    } else {
+                        columns
                     }
-                ) { user ->
 
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + scaleIn(),
-                        exit = fadeOut() + scaleOut()
+                    Row(
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateContentSize(
-                                    animationSpec = tween(400)
-                                )
-                        ) {
+
+                        repeat(itemsInThisRow) {
+
+                            val user = users[index]
+
                             VideoItem(
                                 track = user.second,
                                 isVideoCall = isVideoCall,
@@ -837,17 +748,21 @@ fun SmartVideoGrid(
                                 eglBaseContext = eglBaseContext,
                                 mediaState = mediaStates[user.first],
                                 userName = userNames[user.first] ?: user.first,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
                             )
+
+                            index++
                         }
                     }
                 }
+
             }
         }
+
     }
-
 }
-
 
 @Composable
 fun VideoItem(

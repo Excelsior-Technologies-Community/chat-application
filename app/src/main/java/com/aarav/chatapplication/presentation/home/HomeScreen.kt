@@ -87,16 +87,6 @@ fun HomeScreen(
         Log.i("CHAT", "chatList : " + uiState.chatList.toString())
     }
 
-//    LaunchedEffect(uiState.userId) {
-//        uiState.userId?.let {
-//            homeScreenVM.listenForIncomingCalls(it)
-//
-//            homeScreenVM.incomingCall.collect { call ->
-//                navigateToCall(call.callId, call.callerId, call.receiverId, false)
-//            }
-//        }
-//    }
-
     var showCreateChatModal by remember {
         mutableStateOf(false)
     }
@@ -110,7 +100,6 @@ fun HomeScreen(
     ) {
         homeScreenVM.clearError()
     }
-
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true
@@ -343,23 +332,7 @@ fun DirectChatItem(
                     )
                 }
             }
-            
-//            if (entry.online) {
-//                Surface(
-//                    modifier = Modifier
-//                        .size(14.dp)
-//                        .align(Alignment.BottomEnd),
-//                    shape = CircleShape,
-//                    color = MaterialTheme.colorScheme.surface,
-//                ) {
-//                    Box(
-//                        modifier = Modifier
-//                            .padding(2.dp)
-//                            .size(10.dp)
-//                            .background(Color(0xFF00FF85), CircleShape)
-//                    )
-//                }
-//            }
+
         }
 
         Spacer(Modifier.width(16.dp))
@@ -379,7 +352,7 @@ fun DirectChatItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
+
                 Text(
                     text = formatTimestamp(entry.lastTimestamp),
                     fontFamily = hankenGrotesk,
@@ -407,7 +380,7 @@ fun DirectChatItem(
                         MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
-                
+
                 if (entry.unreadCount > 0) {
                     Spacer(Modifier.width(8.dp))
                     Surface(
@@ -448,7 +421,7 @@ fun GroupChatItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Group initial avatar
+
         Surface(
             modifier = Modifier.size(54.dp),
             shape = CircleShape,
@@ -482,7 +455,7 @@ fun GroupChatItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
+
                 if (entry.lastTimestamp > 0) {
                     Text(
                         text = formatTimestamp(entry.lastTimestamp),
@@ -519,7 +492,7 @@ fun GroupChatItem(
                         MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
-                
+
                 if (entry.unreadCount > 0) {
                     Spacer(Modifier.width(8.dp))
                     Surface(

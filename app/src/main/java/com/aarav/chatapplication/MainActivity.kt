@@ -61,7 +61,6 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
 
-
         ViewCompat.setOnApplyWindowInsetsListener(View(applicationContext)) { v, insets ->
             val systemBars =
                 insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -76,7 +75,7 @@ class MainActivity : ComponentActivity() {
 
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         WindowCompat.getInsetsController(window, View(applicationContext)).apply {
-            //isAppearanceLightStatusBars = false
+
             isAppearanceLightNavigationBars = false
         }
 
@@ -104,7 +103,6 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(false)
                 }
 
-
                 val show = currentRoute in navItems
 
                 val audioPermission = remember {
@@ -129,7 +127,6 @@ class MainActivity : ComponentActivity() {
                     ) == PackageManager.PERMISSION_GRANTED
                 }
 
-
                 val launcher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
                 ) { granted ->
@@ -153,21 +150,12 @@ class MainActivity : ComponentActivity() {
 
                 val mainViewModel: MainVM = hiltViewModel()
 
-//                LaunchedEffect(currentUserId) {
-//                    currentUserId?.let {
-//                        mainViewModel.getCurrentUser(it)
-//                    }
-//                }
-//
-//                val currentUser by mainViewModel.currentUser.collectAsState()
-
                 val callViewModel: CallViewModel = hiltViewModel()
 
                 val call by mainViewModel.incomingCall.collectAsState()
 
                 val callState by callViewModel.callState.collectAsState()
                 val callEnded by callViewModel.callEnded.collectAsState()
-
 
                 var callInfo by remember {
                     mutableStateOf<CallModel?>(null)
@@ -181,7 +169,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-
                 LaunchedEffect(callState) {
                     Log.d("CALL_STATE", callState)
                     if (callState == "IDLE") {
@@ -190,7 +177,6 @@ class MainActivity : ComponentActivity() {
                         mainViewModel.clearIncomingCall()
                     }
 
-
                 }
 
                 LaunchedEffect(currentUserId) {
@@ -198,33 +184,12 @@ class MainActivity : ComponentActivity() {
 
                         mainViewModel.listenForIncomingCalls(it)
 
-//                        launch {
-//                            mainViewModel.incomingCall.collect { call ->
-//                                if (call != null && callState == "IDLE") {
-//                                    showCallBanner = true
-//                                    callInfo = call
-//                                }
-//                            }
-//                        }
-//
-//                        launch {
-//                            mainViewModel.callEnded.collect {
-//                                showCallBanner = false
-//                                callInfo = null
-//                            }
-//                        }
                     }
                 }
-
-
-                /*
-                navController.navigate("call/${call.callId}/${call.callerId}/${call.receiverId}/${false}")
-                 */
 
                 Box(
                     modifier = Modifier.fillMaxSize(),
                 ) {
-
 
                     NavGraph(
                         navController,

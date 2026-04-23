@@ -190,7 +190,6 @@ class ChatViewModel
         }
     }
 
-
     fun isChatCreated(chatId: String, userId: String) {
         viewModelScope.launch {
             messageRepository.isChatCreated(chatId, userId)

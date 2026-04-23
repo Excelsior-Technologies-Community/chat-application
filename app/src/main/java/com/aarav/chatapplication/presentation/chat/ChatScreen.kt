@@ -78,6 +78,7 @@ fun ChatScreen(
     currentUsername: String,
     back: () -> Unit,
     navigateToCall: (Boolean) -> Unit,
+    onInfoClick: () -> Unit,
     chatViewModel: ChatViewModel,
     callViewModel: CallViewModel
 ) {
@@ -101,8 +102,6 @@ fun ChatScreen(
             listState.animateScrollToItem(uiState.messages.lastIndex)
         }
     }
-
-
 
     val scope = rememberCoroutineScope()
 
@@ -135,7 +134,8 @@ fun ChatScreen(
                 Row(
                     modifier = Modifier
                         .padding(top = 0.dp)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .clickable { onInfoClick() },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -236,7 +236,6 @@ fun ChatScreen(
                                 }
                             }
                         }
-
 
                         IconButton(
                             onClick = {

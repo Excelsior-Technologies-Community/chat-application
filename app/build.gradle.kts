@@ -39,11 +39,9 @@ android {
         compose = true
     }
 
-
     kotlinOptions {
         jvmTarget = "17"
     }
-
 
     composeOptions {
         kotlinCompilerExtensionVersion = "2.0.0"
@@ -51,19 +49,16 @@ android {
 
 }
 
-
-
 kapt {
     correctErrorTypes = true
 }
 
 dependencies {
 
-    //WebRTC
     implementation("io.getstream:stream-webrtc-android:1.3.10")
 
     implementation(platform("com.google.firebase:firebase-bom:34.8.0"))
-// Hilt
+
     implementation("com.google.dagger:hilt-android:2.57.2")
     implementation(libs.androidx.hilt.common)
     implementation(libs.androidx.compose.foundation)
@@ -74,7 +69,6 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha13")
     implementation("com.posthog:posthog-android:3.0.0")
 
-    // Add the dependency for the Firebase Authentication library
     implementation("com.google.firebase:firebase-auth")
 
     implementation("androidx.navigation:navigation-compose:2.9.7")

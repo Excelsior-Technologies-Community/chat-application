@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isCodeSent: Boolean = false,
@@ -100,8 +99,6 @@ class AuthViewModel @Inject constructor(
                         error = null
                     )
                 }
-
-
 
                 authRepository.sendOtp(phone, activity)
                     .collect { result ->

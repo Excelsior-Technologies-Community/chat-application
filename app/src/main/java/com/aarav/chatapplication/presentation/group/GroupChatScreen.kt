@@ -68,6 +68,7 @@ fun GroupChatScreen(
     senderName: String,
     back: () -> Unit,
     onCallStart: (Boolean) -> Unit,
+    onInfoClick: () -> Unit,
     viewModel: GroupChatViewModel,
     callViewModel: CallViewModel
 ) {
@@ -98,7 +99,6 @@ fun GroupChatScreen(
         }
     }
 
-
     MyAlertDialog(
         shouldShowDialog = uiState.showErrorDialog,
         onDismissRequest = { viewModel.clearError() },
@@ -126,7 +126,8 @@ fun GroupChatScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 0.dp),
+                        .padding(top = 0.dp)
+                        .clickable { onInfoClick() },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -196,9 +197,9 @@ fun GroupChatScreen(
                                         color = MaterialTheme.colorScheme.secondary
                                     )
                                 } else {
-                                    val memberCount = uiState.group?.members?.size ?: 0
+                                    val memberCount = uiState.group?.members?.filter { it.value }?.size ?: 0
                                     Text(
-                                        "$memberCount members",
+                                        "$memberCount active members",
                                         fontFamily = hankenGrotesk,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Normal,
@@ -320,19 +321,39 @@ fun GroupChatScreen(
                     }
                 }
 
-                TextTypeBox(
-                    isFocused = isFocused,
-                    onFocusChange = { isFocused = it },
-                    text = text,
-                    onValueChange = { text = it },
-                    onStartTyping = { viewModel.onTypingStarted() },
-                    onStopTyping = { viewModel.onTypingStopped() },
-                    error = uiState.messageError,
-                    modifier = Modifier
-                ) {
-                    viewModel.sendMessage(text)
-                    text = ""
-                    viewModel.onTypingStopped()
+                if (uiState.group?.members?.get(myId) == true) {
+                    TextTypeBox(
+                        isFocused = isFocused,
+                        onFocusChange = { isFocused = it },
+                        text = text,
+                        onValueChange = { text = it },
+                        onStartTyping = { viewModel.onTypingStarted() },
+                        onStopTyping = { viewModel.onTypingStopped() },
+                        error = uiState.messageError,
+                        modifier = Modifier
+                    ) {
+                        viewModel.sendMessage(text)
+                        text = ""
+                        viewModel.onTypingStopped()
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Text(
+                            "You can no longer send messages to this group.",
+                            modifier = Modifier.padding(16.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            fontFamily = hankenGrotesk,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
             }
 

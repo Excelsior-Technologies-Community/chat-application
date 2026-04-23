@@ -77,6 +77,11 @@ class GroupChatViewModel @Inject constructor(
         val senderId = currentUserId ?: return
         val group = _uiState.value.group ?: return
 
+        if (group.members[senderId] != true) {
+            _uiState.update { it.copy(messageError = "You are no longer a member of this group") }
+            return
+        }
+
         if (text.isBlank()) {
             _uiState.update { it.copy(messageError = "Message cannot be blank") }
             return
@@ -87,13 +92,13 @@ class GroupChatViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSending = true) }
 
-            val memberIds = group.members.keys.toList()
+            val activeMemberIds = group.members.filter { it.value }.keys.toList()
 
             when (val result = groupChatRepository.sendGroupMessage(
                 groupId = groupId,
                 senderId = senderId,
                 senderName = senderName,
-                memberIds = memberIds,
+                memberIds = activeMemberIds,
                 text = text
             )) {
                 is Result.Success -> {

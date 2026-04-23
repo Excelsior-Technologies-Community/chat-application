@@ -14,4 +14,12 @@ interface GroupRepository {
     fun observeGroup(groupId: String): Flow<Group>
 
     fun observeUserGroups(userId: String): Flow<List<String>>
+
+    suspend fun updateGroupName(groupId: String, newName: String): Result<Unit>
+
+    suspend fun addMembers(groupId: String, memberIds: List<String>): Result<Unit>
+
+    suspend fun removeMember(groupId: String, userId: String): Result<Unit>
+
+    suspend fun leaveGroup(groupId: String, userId: String): Result<Unit>
 }

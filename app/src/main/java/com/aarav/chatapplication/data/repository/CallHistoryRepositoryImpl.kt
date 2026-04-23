@@ -26,7 +26,7 @@ class CallHistoryRepositoryImpl @Inject constructor(
         val query = firebaseDatabase.reference.child("call_history")
             .orderByChild("participants/$userId")
             .equalTo(true)
-        
+
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val histories = mutableListOf<CallHistoryModel>()
@@ -47,7 +47,7 @@ class CallHistoryRepositoryImpl @Inject constructor(
                 close(error.toException())
             }
         }
-        
+
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
     }

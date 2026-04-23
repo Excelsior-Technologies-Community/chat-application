@@ -61,22 +61,6 @@ class HomeScreenVM
         }
     }
 
-//    private val _incomingCall = MutableSharedFlow<CallModel>()
-//    val incomingCall = _incomingCall.asSharedFlow()
-//
-//    fun listenForIncomingCalls(userId: String) {
-//        Log.d("CALL", "Listening for incoming calls")
-//
-//        viewModelScope.launch {
-//            signalingClient.listenForIncomingCalls(userId)
-//                .collect { call ->
-//                    if (call.offer != null && call.answer == null) {
-//                        _incomingCall.emit(call)
-//                    }
-//                }
-//        }
-//    }
-
     private fun observeUserPresence() {
         viewModelScope.launch {
             uiState

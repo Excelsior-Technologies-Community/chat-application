@@ -26,18 +26,15 @@ class MainVM
     private val _incomingCall = MutableStateFlow<CallModel?>(null)
     val incomingCall = _incomingCall.asStateFlow()
 
-
     fun listenForIncomingCalls(userId: String) {
         viewModelScope.launch {
             signalingClient.listenForIncomingCalls(userId)
                 .collect { call ->
 
-
                     if (call.ended) {
                         _incomingCall.value = null
                         return@collect
                     }
-
 
                     val isMyActiveCall = call.callId == callStateManager.activeCallId
 

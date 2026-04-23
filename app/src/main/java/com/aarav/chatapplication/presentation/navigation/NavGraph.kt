@@ -49,6 +49,8 @@ fun NavGraph(
         addAuthScreen(navHostController, this)
         addProfileScreen(navHostController, this)
         addCallHistoryScreen(navHostController, this)
+        addGroupInfoScreen(navHostController, this)
+        addChatInfoScreen(navHostController, this)
     }
 }
 
@@ -173,6 +175,9 @@ fun addChatScreen(navController: NavController, navGraphBuilder: NavGraphBuilder
                     )
                 )
             },
+            onInfoClick = {
+                navController.navigate(NavRoute.ChatInfo.createRoute(receiverId))
+            },
             chatViewModel = hiltViewModel(),
             callViewModel = callViewModel
         )
@@ -212,6 +217,9 @@ fun addGroupChatScreen(
                   )
               )
             },
+            onInfoClick = {
+                navController.navigate(NavRoute.GroupInfo.createRoute(groupId, userId))
+            },
             viewModel = hiltViewModel(),
             callViewModel = callViewModel
         )
@@ -241,7 +249,6 @@ fun addCreateGroupScreen(navController: NavController, navGraphBuilder: NavGraph
         )
     }
 }
-
 
 fun addGroupCallScreen(
     navController: NavController,
@@ -278,7 +285,6 @@ fun addGroupCallScreen(
     }
 }
 
-
 fun addOneToOneCallScreen(
     navController: NavController,
     navGraphBuilder: NavGraphBuilder,
@@ -310,6 +316,48 @@ fun addOneToOneCallScreen(
                 navController.popBackStack()
             },
             viewModel = callViewModel
+        )
+    }
+}
+
+fun addGroupInfoScreen(navController: NavController, navGraphBuilder: NavGraphBuilder) {
+    navGraphBuilder.composable(
+        route = NavRoute.GroupInfo.path.plus("/{groupId}/{currentUserId}"),
+        arguments = listOf(
+            navArgument("groupId") { type = NavType.StringType },
+            navArgument("currentUserId") { type = NavType.StringType }
+        )
+    ) {
+        val groupId = it.arguments?.getString("groupId").toString()
+        val currentUserId = it.arguments?.getString("currentUserId").toString()
+
+        com.aarav.chatapplication.presentation.group_info.GroupInfoScreen(
+            groupId = groupId,
+            currentUserId = currentUserId,
+            onBack = { navController.popBackStack() },
+            viewModel = hiltViewModel(),
+            onNavigateToChatList = {
+                navController.navigate(NavRoute.Home.path) {
+                    popUpTo(NavRoute.Home.path) { inclusive = true }
+                }
+            }
+        )
+    }
+}
+
+fun addChatInfoScreen(navController: NavController, navGraphBuilder: NavGraphBuilder) {
+    navGraphBuilder.composable(
+        route = NavRoute.ChatInfo.path.plus("/{userId}"),
+        arguments = listOf(
+            navArgument("userId") { type = NavType.StringType }
+        )
+    ) {
+        val userId = it.arguments?.getString("userId").toString()
+
+        com.aarav.chatapplication.presentation.chat_info.ChatInfoScreen(
+            userId = userId,
+            onBack = { navController.popBackStack() },
+            viewModel = hiltViewModel()
         )
     }
 }

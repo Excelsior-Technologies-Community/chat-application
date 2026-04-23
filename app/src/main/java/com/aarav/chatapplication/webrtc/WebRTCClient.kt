@@ -86,16 +86,13 @@ class WebRTCClient
 
     var onPeerConnected: ((String) -> Unit)? = null
 
-
     fun init() {
 
         if (peerConnectionFactory != null) return
 
-
         _connectionState.value = "NEW"
 
         Log.d(TAG, "Initializing WebRTC (Singleton)")
-
 
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(context)
@@ -103,10 +100,8 @@ class WebRTCClient
                 .createInitializationOptions()
         )
 
-
         eglBase = EglBase.create()
         _eglContext.value = eglBase.eglBaseContext
-
 
         audioDeviceModule = JavaAudioDeviceModule.builder(context)
             .setUseHardwareAcousticEchoCanceler(true)
@@ -158,7 +153,6 @@ class WebRTCClient
             Log.e(TAG, "factory.createPeerConnection returned null for $userId")
             return
         }
-
 
         localAudioTrack?.let { pc.addTrack(it, streamIds) }
         localVideoTrack?.let { pc.addTrack(it, streamIds) }
@@ -607,7 +601,6 @@ class WebRTCClient
             isClosingAllConnections = false
         }
     }
-
 
     fun removePeerConnection(userId: String) {
         peerConnections.remove(userId)?.let {

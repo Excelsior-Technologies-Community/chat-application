@@ -84,7 +84,6 @@ class UserRepositoryImpl @Inject constructor(
 
     override fun getAllUsers(): Flow<List<User>> = callbackFlow {
 
-
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val users = snapshot.children.mapNotNull {

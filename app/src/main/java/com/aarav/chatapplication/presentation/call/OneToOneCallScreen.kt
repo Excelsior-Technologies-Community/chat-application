@@ -20,9 +20,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import com.aarav.chatapplication.presentation.components.CallInfoSheet
+import com.aarav.chatapplication.presentation.components.CustomBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,8 +54,12 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import android.app.Activity
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.graphics.toArgb
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OneToOneCallScreen(
     callId: String,
@@ -62,7 +71,6 @@ fun OneToOneCallScreen(
     viewModel: CallViewModel
 ) {
     val context = LocalContext.current
-
 
     val eglBaseContext by viewModel.eglContext.collectAsState()
 
@@ -105,15 +113,17 @@ fun OneToOneCallScreen(
 
     val time by viewModel.callTime.collectAsState()
 
-
     val isVideoEnabled by viewModel.isVideoEnabled.collectAsState()
     val mediaStates by viewModel.mediaStates.collectAsState()
 
     val activeParticipants by viewModel.activeParticipants.collectAsState()
     val userNames by viewModel.usersMapping.collectAsState()
 
+    var showInfoSheet by remember { mutableStateOf(false) }
+    val infoSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     val remoteUserId = activeParticipants.firstOrNull { it != myUserId }
-        ?: tracks.keys.firstOrNull { it != "LOCAL" } 
+        ?: tracks.keys.firstOrNull { it != "LOCAL" }
         ?: mediaStates.keys.firstOrNull { it != myUserId }
 
     val displayRemoteName = if (remoteUserId != null) {
@@ -126,7 +136,6 @@ fun OneToOneCallScreen(
     val isRemoteMuted = remoteUserId?.let { mediaStates[it]?.muted } ?: false
 
     val isRemoteReady = tracks.any { it.key != "LOCAL" } && state == "CONNECTED"
-
 
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -186,7 +195,6 @@ fun OneToOneCallScreen(
         }
     }
 
-
     LaunchedEffect(Unit) {
 
         viewModel.events.collect { event ->
@@ -213,7 +221,6 @@ fun OneToOneCallScreen(
             }
         }
     }
-
 
     LaunchedEffect(tracks) {
         if (isVideoCall && !callEnded) {
@@ -248,7 +255,6 @@ fun OneToOneCallScreen(
             remoteView.setZOrderMediaOverlay(false)
             remoteView.setZOrderOnTop(false)
 
-
             localView.init(eglBaseContext, null)
             localView.setMirror(true)
             localView.setZOrderOnTop(true)
@@ -257,9 +263,7 @@ fun OneToOneCallScreen(
         }
     }
 
-
     DisposableEffect(Unit) {
-
 
         onDispose {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -271,15 +275,6 @@ fun OneToOneCallScreen(
             audioManager.mode = AudioManager.MODE_NORMAL
             audioManager.isSpeakerphoneOn = false
             audioManager.isMicrophoneMute = false
-
-//            val localTrack = tracks["LOCAL"]
-//            localTrack?.removeSink(localView)
-//
-//            val remoteTrack = tracks.entries
-//                .firstOrNull { it.key != "LOCAL" }
-//                ?.value
-//
-//            remoteTrack?.removeSink(remoteView)
 
             try {
                 localView.clearImage()
@@ -296,6 +291,19 @@ fun OneToOneCallScreen(
         }
     }
 
+    if (showInfoSheet) {
+        CustomBottomSheet(
+            sheetState = infoSheetState,
+            onDismiss = { showInfoSheet = false },
+            title = "Call Info"
+        ) {
+            CallInfoSheet(
+                participants = userNames,
+                activeParticipants = setOf(myUserId, remoteUserId ?: ""),
+                onDismiss = { showInfoSheet = false }
+            )
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFF121212),
@@ -438,11 +446,11 @@ fun OneToOneCallScreen(
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                             )
                         }
-                        
+
                         Spacer(Modifier.height(16.dp))
 
                         Text(displayRemoteName, color = Color.White, fontSize = 24.sp)
-                        
+
                         if (isRemoteMuted) {
                             Spacer(Modifier.height(8.dp))
                             Row(
@@ -516,6 +524,23 @@ fun OneToOneCallScreen(
                         )
                     }
                 }
+
+                IconButton(
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.7f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    onClick = {
+                        showInfoSheet = true
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.info),
+                        contentDescription = "Call Info",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             CallActionToolbar(
@@ -548,6 +573,5 @@ fun OneToOneCallScreen(
         }
 
     }
-
 
 }

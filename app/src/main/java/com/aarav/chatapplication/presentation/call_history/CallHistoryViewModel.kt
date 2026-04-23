@@ -23,7 +23,6 @@ class CallHistoryViewModel @Inject constructor(
     private val _callHistory = MutableStateFlow<List<CallHistoryModel>>(emptyList())
     val callHistory = _callHistory.asStateFlow()
 
-
     private val _isLoading = MutableStateFlow<Boolean>(false)
     val isLoading = _isLoading.asStateFlow()
 

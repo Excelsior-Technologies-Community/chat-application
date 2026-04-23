@@ -71,4 +71,4 @@ abstract class RepositoryModule {
     abstract fun bindCallHistoryRepository(
         callHistoryRepositoryImpl: CallHistoryRepositoryImpl
     ): CallHistoryRepository
-}
+}

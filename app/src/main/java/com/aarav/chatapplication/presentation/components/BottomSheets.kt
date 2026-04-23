@@ -86,7 +86,6 @@ fun CustomBottomSheet(
                     fontWeight = FontWeight.Bold
                 )
 
-
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -230,7 +229,6 @@ fun AddParticipantsSheet(
         }
     }
 }
-
 
 @Composable
 fun AddParticipantUserCard(
