@@ -167,4 +167,37 @@ class GroupChatRepositoryImpl @Inject constructor(
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }
+
+    override suspend fun deleteGroupMessage(
+        groupId: String,
+        messageId: String,
+        deletedBy: String
+    ): Result<Unit> {
+        return try {
+            val messageRef = rootRef.child(FirebasePaths.groupMessage(groupId, messageId))
+            val messageSnapshot = messageRef.get().await()
+            val message = messageSnapshot.getValue(GroupMessage::class.java) ?: throw Exception("Message not found")
+
+            val updates = mutableMapOf<String, Any>(
+                "${FirebasePaths.groupMessage(groupId, messageId)}/text" to "This message was deleted",
+                "${FirebasePaths.groupMessage(groupId, messageId)}/isDeleted" to true,
+                "${FirebasePaths.groupMessage(groupId, messageId)}/deletedBy" to deletedBy
+            )
+
+            // Update meta if this was the last message
+            val metaRef = rootRef.child(FirebasePaths.groupMeta(groupId))
+            val metaSnapshot = metaRef.get().await()
+            val meta = metaSnapshot.getValue(GroupMeta::class.java)
+
+            if (meta != null && meta.lastTimestamp == message.timestamp) {
+                updates["${FirebasePaths.groupMeta(groupId)}/lastMessage"] = "This message was deleted"
+            }
+
+            rootRef.updateChildren(updates).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to delete message")
+        }
+    }
 }
+

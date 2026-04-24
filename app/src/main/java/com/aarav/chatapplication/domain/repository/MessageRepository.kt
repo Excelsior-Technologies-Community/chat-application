@@ -23,4 +23,6 @@ interface MessageRepository {
     suspend fun makeChatMessagesDelivered(chatId: String, receiverId: String)
 
     fun isChatCreated(chatId: String, userId: String): Flow<Boolean>
-}
+
+    suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit>
+}

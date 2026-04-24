@@ -27,4 +27,6 @@ interface GroupChatRepository {
     suspend fun clearGroupTyping(groupId: String, userId: String)
 
     fun observeGroupTyping(groupId: String): Flow<List<String>>
-}
+
+    suspend fun deleteGroupMessage(groupId: String, messageId: String, deletedBy: String): Result<Unit>
+}

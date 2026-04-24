@@ -1,6 +1,7 @@
 package com.aarav.chatapplication.data.repository
 
 import com.aarav.chatapplication.data.model.Group
+import com.aarav.chatapplication.data.model.GroupPermissions
 import com.aarav.chatapplication.data.remote.FirebasePaths
 import com.aarav.chatapplication.domain.repository.GroupRepository
 import com.aarav.chatapplication.utils.Result
@@ -38,7 +39,8 @@ class GroupRepositoryImpl @Inject constructor(
                 avatar = "0xFF6C63FF",
                 createdBy = creatorId,
                 createdAt = System.currentTimeMillis(),
-                members = membersMap
+                members = membersMap,
+                admins = listOf(creatorId)
             )
 
             val updates = hashMapOf<String, Any>(
@@ -132,4 +134,81 @@ class GroupRepositoryImpl @Inject constructor(
             Result.Error(e.message ?: "Failed to leave group")
         }
     }
+
+    override suspend fun promoteToAdmin(groupId: String, userId: String): Result<Unit> {
+        return try {
+            val groupRef = rootRef.child(FirebasePaths.group(groupId))
+            val snapshot = groupRef.get().await()
+            val group = snapshot.getValue(Group::class.java)
+            val admins = group?.admins?.toMutableList() ?: mutableListOf()
+            if (!admins.contains(userId)) {
+                admins.add(userId)
+                groupRef.child("admins").setValue(admins).await()
+            }
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to promote to admin")
+        }
+    }
+
+    override suspend fun demoteFromAdmin(groupId: String, userId: String): Result<Unit> {
+        return try {
+            val groupRef = rootRef.child(FirebasePaths.group(groupId))
+            val snapshot = groupRef.get().await()
+            val group = snapshot.getValue(Group::class.java)
+            val admins = group?.admins?.toMutableList() ?: mutableListOf()
+            if (admins.contains(userId) && group?.createdBy != userId) {
+                admins.remove(userId)
+                groupRef.child("admins").setValue(admins).await()
+            }
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to demote from admin")
+        }
+    }
+
+    override suspend fun updateGroupPermissions(
+        groupId: String,
+        permissions: GroupPermissions
+    ): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("permissions").setValue(permissions).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to update group permissions")
+        }
+    }
+
+    override suspend fun updateGroupDescription(
+        groupId: String,
+        description: String
+    ): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("description").setValue(description).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to update group description")
+        }
+    }
+
+    override suspend fun pinMessage(groupId: String, messageId: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("pinnedMessageId").setValue(messageId).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to pin message")
+        }
+    }
+
+    override suspend fun unpinMessage(groupId: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("pinnedMessageId").removeValue().await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to unpin message")
+        }
+    }
 }
+
+
+

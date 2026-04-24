@@ -134,4 +134,31 @@ class MessageRepositoryImpl @Inject constructor(
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }
-}
+
+    override suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit> {
+        return try {
+            val messageRef = rootRef.child(FirebasePaths.message(chatId, messageId))
+            val snapshot = messageRef.get().await()
+            val message = snapshot.getValue(Message::class.java) ?: throw Exception("Message not found")
+
+            val updates = mutableMapOf<String, Any>(
+                "${FirebasePaths.message(chatId, messageId)}/text" to "This message was deleted",
+                "${FirebasePaths.message(chatId, messageId)}/isDeleted" to true
+            )
+
+            // Update meta if last message
+            val metaRef = rootRef.child(FirebasePaths.chatMeta(chatId))
+            val metaSnapshot = metaRef.get().await()
+            val meta = metaSnapshot.getValue(ChatMeta::class.java)
+
+            if (meta != null && meta.lastTimestamp == message.timestamp) {
+                updates["${FirebasePaths.chatMeta(chatId)}/lastMessage"] = "This message was deleted"
+            }
+
+            rootRef.updateChildren(updates).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to delete message")
+        }
+    }
+}

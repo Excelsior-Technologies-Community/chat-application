@@ -3,6 +3,7 @@ package com.aarav.chatapplication.presentation.group_info
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aarav.chatapplication.data.model.Group
+import com.aarav.chatapplication.data.model.GroupPermissions
 import com.aarav.chatapplication.domain.model.User
 import com.aarav.chatapplication.domain.repository.GroupRepository
 import com.aarav.chatapplication.domain.repository.UserRepository
@@ -26,12 +27,12 @@ class GroupInfoViewModel @Inject constructor(
             groupRepository.observeGroup(groupId)
                 .collect { group ->
                     _uiState.update { it.copy(group = group) }
-                    observeMembersAndAvailableUsers(group.members)
+                    observeMembersAndAvailableUsers(group.members, group.admins)
                 }
         }
     }
 
-    private fun observeMembersAndAvailableUsers(members: Map<String, Boolean>) {
+    private fun observeMembersAndAvailableUsers(members: Map<String, Boolean>, admins: List<String>) {
         viewModelScope.launch {
             userRepository.getAllUsers()
                 .collect { allUsers ->
@@ -39,7 +40,8 @@ class GroupInfoViewModel @Inject constructor(
                         .map { user ->
                             MemberInfo(
                                 user = user,
-                                isActive = members[user.uid] ?: false
+                                isActive = members[user.uid] ?: false,
+                                isAdmin = admins.contains(user.uid)
                             )
                         }
 
@@ -87,7 +89,34 @@ class GroupInfoViewModel @Inject constructor(
     fun clearLeaveState() {
         _uiState.update { it.copy(hasLeftGroup = false) }
     }
+
+    fun promoteToAdmin(groupId: String, userId: String) {
+        viewModelScope.launch {
+            groupRepository.promoteToAdmin(groupId, userId)
+        }
+    }
+
+    fun demoteFromAdmin(groupId: String, userId: String) {
+        viewModelScope.launch {
+            groupRepository.demoteFromAdmin(groupId, userId)
+        }
+    }
+
+    fun updatePermissions(groupId: String, permissions: GroupPermissions) {
+        viewModelScope.launch {
+            groupRepository.updateGroupPermissions(groupId, permissions)
+        }
+    }
+
+    fun updateDescription(groupId: String, description: String) {
+        viewModelScope.launch {
+            groupRepository.updateGroupDescription(groupId, description)
+        }
+    }
 }
+
+
+
 
 data class GroupInfoUiState(
     val group: Group? = null,
@@ -99,5 +128,6 @@ data class GroupInfoUiState(
 
 data class MemberInfo(
     val user: User,
-    val isActive: Boolean
-)
+    val isActive: Boolean,
+    val isAdmin: Boolean
+)

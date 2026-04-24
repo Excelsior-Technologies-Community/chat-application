@@ -200,7 +200,15 @@ class ChatViewModel
                 }
         }
     }
+
+    fun deleteMessage(messageId: String) {
+        val chatId = currentChatId ?: return
+        viewModelScope.launch {
+            messageRepository.deleteMessage(chatId, messageId)
+        }
+    }
 }
+
 
 data class ChatUiState(
     val error: String? = null,

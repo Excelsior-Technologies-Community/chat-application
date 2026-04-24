@@ -6,5 +6,7 @@ data class GroupMessage(
     val senderName: String = "",
     val text: String = "",
     val timestamp: Long = 0L,
-    val status: String = MessageStatus.SENT.name
-)
+    val status: String = MessageStatus.SENT.name,
+    val isDeleted: Boolean = false,
+    val deletedBy: String? = null
+)
