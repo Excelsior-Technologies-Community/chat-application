@@ -190,6 +190,25 @@ class GroupRepositoryImpl @Inject constructor(
             Result.Error(e.message ?: "Failed to update group description")
         }
     }
+
+    override suspend fun pinMessage(groupId: String, messageId: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("pinnedMessageId").setValue(messageId).await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to pin message")
+        }
+    }
+
+    override suspend fun unpinMessage(groupId: String): Result<Unit> {
+        return try {
+            rootRef.child(FirebasePaths.group(groupId)).child("pinnedMessageId").removeValue().await()
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Failed to unpin message")
+        }
+    }
 }
+
 
 

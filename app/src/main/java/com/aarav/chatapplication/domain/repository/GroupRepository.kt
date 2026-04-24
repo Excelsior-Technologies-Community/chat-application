@@ -31,6 +31,11 @@ interface GroupRepository {
     suspend fun updateGroupPermissions(groupId: String, permissions: GroupPermissions): Result<Unit>
 
     suspend fun updateGroupDescription(groupId: String, description: String): Result<Unit>
+
+    suspend fun pinMessage(groupId: String, messageId: String): Result<Unit>
+
+    suspend fun unpinMessage(groupId: String): Result<Unit>
 }
+
 
 

@@ -38,9 +38,13 @@ class GroupChatViewModel @Inject constructor(
                 }
                 .collect { group ->
                     _uiState.update {
-                        it.copy(group = group)
+                        it.copy(
+                            group = group,
+                            pinnedMessage = it.messages.find { msg -> msg.messageId == group.pinnedMessageId }
+                        )
                     }
                 }
+
         }
     }
 
@@ -62,8 +66,12 @@ class GroupChatViewModel @Inject constructor(
                 }
                 .collect { messages ->
                     _uiState.update {
-                        it.copy(messages = messages)
+                        it.copy(
+                            messages = messages,
+                            pinnedMessage = messages.find { msg -> msg.messageId == it.group?.pinnedMessageId }
+                        )
                     }
+
 
                     if (messages.any { it.senderId != myId }) {
                         groupChatRepository.markGroupMessagesRead(groupId, myId)
@@ -173,8 +181,21 @@ class GroupChatViewModel @Inject constructor(
             groupChatRepository.deleteGroupMessage(groupId, messageId, myId)
         }
     }
-}
 
+    fun pinMessage(messageId: String) {
+        val groupId = currentGroupId ?: return
+        viewModelScope.launch {
+            groupRepository.pinMessage(groupId, messageId)
+        }
+    }
+
+    fun unpinMessage() {
+        val groupId = currentGroupId ?: return
+        viewModelScope.launch {
+            groupRepository.unpinMessage(groupId)
+        }
+    }
+}
 
 data class GroupChatUiState(
     val error: String? = null,
@@ -184,5 +205,6 @@ data class GroupChatUiState(
     val isSending: Boolean = false,
     val group: Group? = null,
     val senderName: String = "",
-    val typingUserIds: List<String> = emptyList()
-)
+    val typingUserIds: List<String> = emptyList(),
+    val pinnedMessage: GroupMessage? = null
+)
