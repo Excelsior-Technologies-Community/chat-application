@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -302,34 +303,62 @@ fun ChatScreen(
                     }
                 }
 
-                LazyColumn(
-                    state = listState,
-                    flingBehavior = ScrollableDefaults.flingBehavior(),
+                Box(
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.surfaceContainerLow)
                         .weight(1f)
                 ) {
-                    items(uiState.messages) { chat ->
-                        val isMine = chat.senderId == myId
-                        ChatCard(chat, isMine)
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.messages) { message ->
+                            val isMine = message.senderId == myId
+                            ChatCard(
+                                message = message,
+                                isMine = isMine,
+                                onDelete = {
+                                    chatViewModel.deleteMessage(message.messageId)
+                                }
+                            )
+                        }
+
+                        item {
+                            if (!uiState.isChatCreated) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp, vertical = 36.dp)
+                                ) {
+                                    Text(
+                                        "Say Hey to ${uiState.user?.name} and start a conversation",
+                                        fontFamily = hankenGrotesk,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
                     }
 
-                    item {
-                        if (!uiState.isChatCreated) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 36.dp)
-                            ) {
-                                Text(
-                                    "Say Hey to ${uiState.user?.name} and start a conversation",
-                                    fontFamily = hankenGrotesk,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                    if (uiState.messages.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 16.dp)
+                        ) {
+                            Text(
+                                buildRelativeTime(uiState.messages.last().timestamp),
+                                fontFamily = hankenGrotesk,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiary,
+                                modifier = Modifier.padding(vertical = 6.dp, horizontal = 24.dp)
+                            )
                         }
                     }
                 }
@@ -350,26 +379,8 @@ fun ChatScreen(
                 }
             }
 
-            if (uiState.messages.isNotEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 92.dp)
-                ) {
-                    Text(
-                        buildRelativeTime(uiState.messages.last().timestamp),
-                        fontFamily = hankenGrotesk,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onTertiary,
-                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 24.dp)
-                    )
                 }
             }
-        }
-    }
 }
 
 @Composable
@@ -455,16 +466,23 @@ fun TextTypeBox(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatCard(
     message: Message,
-    isMine: Boolean
+    isMine: Boolean,
+    onDelete: () -> Unit
 ) {
-    val bg =
-        if (isMine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-    val content =
-        if (isMine) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+    val bg = if (message.isDeleted) MaterialTheme.colorScheme.surfaceVariant
+    else if (isMine) MaterialTheme.colorScheme.primaryContainer
+    else MaterialTheme.colorScheme.secondaryContainer
+    
+    val content = if (message.isDeleted) MaterialTheme.colorScheme.outline
+    else if (isMine) MaterialTheme.colorScheme.onPrimaryContainer
+    else MaterialTheme.colorScheme.onSecondaryContainer
+    
     val alignment = if (isMine) Alignment.End else Alignment.Start
+    var showMenu by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -479,23 +497,59 @@ fun ChatCard(
                 horizontalAlignment = alignment,
                 modifier = Modifier.fillMaxWidth(0.85f)
             ) {
-                Card(
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = bg
-                    ),
-                    modifier = Modifier,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp)
+                Box {
+                    Card(
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = bg),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = {
+                                    if (!message.isDeleted && isMine) {
+                                        showMenu = true
+                                    }
+                                }
+                            )
                     ) {
-                        Text(
-                            message.text,
-                            fontFamily = hankenGrotesk,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.W700,
-                            modifier = Modifier,
-                            color = content
+                        Row(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = if (message.isDeleted) "This message was deleted" else message.text,
+                                fontFamily = hankenGrotesk,
+                                fontSize = 14.sp,
+                                fontWeight = if (message.isDeleted) FontWeight.Normal else FontWeight.W700,
+                                color = content,
+                                fontStyle = if (message.isDeleted) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                            )
+                        }
+                    }
+
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { 
+                                Text(
+                                    "Delete for Everyone", 
+                                    fontFamily = hankenGrotesk,
+                                    color = MaterialTheme.colorScheme.error
+                                ) 
+                            },
+                            onClick = {
+                                onDelete()
+                                showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    painterResource(R.drawable.remove),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         )
                     }
                 }
@@ -510,16 +564,16 @@ fun ChatCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.W700,
                     modifier = Modifier,
-                    color = content
+                    color = MaterialTheme.colorScheme.outline
                 )
 
                 Spacer(Modifier.width(4.dp))
 
-                Surface(
-                    color = Color.Transparent,
-                    modifier = Modifier
-                ) {
-                    if (isMine) {
+                if (isMine && !message.isDeleted) {
+                    Surface(
+                        color = Color.Transparent,
+                        modifier = Modifier
+                    ) {
                         MessageStatusIcon(message.status)
                     }
                 }
@@ -527,6 +581,7 @@ fun ChatCard(
         }
     }
 }
+
 
 fun formatTimestamp(timestamp: Long): String {
     val df = SimpleDateFormat("HH:mm", Locale.getDefault())

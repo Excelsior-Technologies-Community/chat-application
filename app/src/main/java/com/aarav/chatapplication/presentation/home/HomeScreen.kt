@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -224,18 +225,6 @@ fun HomeScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    IconButton(
-                        onClick = {
-                            homeScreenVM.logout()
-                            onLogout()
-                        }
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.log_out),
-                            contentDescription = "log out",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
             )
         },
@@ -251,8 +240,7 @@ fun HomeScreen(
                     .fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-
-                ContainedLoadingIndicator()
+                LoadingIndicator()
             }
         } else {
             LazyColumn(
