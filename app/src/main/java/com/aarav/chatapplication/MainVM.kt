@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aarav.chatapplication.data.model.CallModel
 import com.aarav.chatapplication.domain.model.User
 import com.aarav.chatapplication.domain.repository.UserRepository
+import com.aarav.chatapplication.notification.MessageNotificationManager
 import com.aarav.chatapplication.webrtc.CallStateManager
 import com.aarav.chatapplication.webrtc.SignalingClient
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,12 +22,25 @@ class MainVM
 @Inject constructor(
     val signalingClient: SignalingClient,
     val userRepository: UserRepository,
-    val callStateManager: CallStateManager
+    val callStateManager: CallStateManager,
+    private val notificationManager: MessageNotificationManager,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
     private val _incomingCall = MutableStateFlow<CallModel?>(null)
     val incomingCall = _incomingCall.asStateFlow()
 
+    private val _currentUserName = MutableStateFlow("You")
+    val currentUserName = _currentUserName.asStateFlow()
+
     fun listenForIncomingCalls(userId: String) {
+        com.aarav.chatapplication.notification.ChatNotificationService.start(context, userId)
+        
+        viewModelScope.launch {
+            userRepository.findUserByUserId(userId).collect {
+                _currentUserName.value = it.name ?: "You"
+            }
+        }
+
         viewModelScope.launch {
             signalingClient.listenForIncomingCalls(userId)
                 .collect { call ->
@@ -64,4 +78,7 @@ class MainVM
         _incomingCall.value = null
     }
 
+    fun stopNotificationListening() {
+        com.aarav.chatapplication.notification.ChatNotificationService.stop(context)
+    }
 }
