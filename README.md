@@ -12,19 +12,36 @@ A modern Android application that enables real-time 1-1 and group communication 
 - Unread message tracking  
 - Message status handling  
 
+### Messaging Enhancements
+- Pin important messages (visible to all members)  
+- Unpin or replace pinned messages  
+- Delete messages for everyone  
+
+### Notifications
+- Local notifications for new messages  
+- Smart notification handling (anti-spam, avoids duplicates)  
+- Background message alerts  
+
 ### Calling (WebRTC)
 - Peer-to-peer audio and video calling  
 - Group calling using mesh architecture  
 - Dynamic participant join and leave  
-- Mute, video toggle, and speaker controls  
+- Mute, video toggle and speaker controls  
 - Real-time connection state handling  
 
 ### Group Management
 - Create and manage groups  
 - Add and remove participants  
-- Rename group  
-- Leave group functionality  
-- Removed users retain chat history (read-only access)  
+- Rename groups  
+- Leave groups  
+- Removed users retain chat history with read-only access  
+
+### Admin Controls & Roles
+- Multi-admin support with role-based permissions  
+- Admin-controlled group description editing  
+- Permission controls for:
+  - Editing group info  
+  - Inviting new members  
 
 ### Call History
 - Tracks calls:
@@ -47,8 +64,6 @@ A modern Android application that enables real-time 1-1 and group communication 
 ## Architecture
 
 - MVVM + Clean Architecture  
-- Kotlin Flow / StateFlow for reactive UI  
-- Repository pattern  
 - Separation of concerns  
 
 ---
@@ -68,7 +83,7 @@ A modern Android application that enables real-time 1-1 and group communication 
 - Push Notifications (FCM)  
 - End-to-End Encryption  
 - Active speaker detection  
-- Improved network resilience
+- Improved network resilience  
 
 ---
 
