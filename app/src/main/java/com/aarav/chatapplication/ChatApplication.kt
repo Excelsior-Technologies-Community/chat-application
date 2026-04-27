@@ -1,12 +1,14 @@
 package com.aarav.chatapplication
 
 import android.app.Application
-import androidx.compose.ui.res.stringResource
-import com.posthog.android.PostHogAndroid
-import com.posthog.android.PostHogAndroidConfig
+import com.aarav.chatapplication.notification.NotificationChannels
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
-class ChatApplication: Application() {
+class ChatApplication : Application() {
 
+    override fun onCreate() {
+        super.onCreate()
+        NotificationChannels.createAll(this)
+    }
 }
