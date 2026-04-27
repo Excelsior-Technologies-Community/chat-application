@@ -60,8 +60,13 @@ class MessageNotificationManager @Inject constructor(
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val message = snapshot.getValue(Message::class.java) ?: return
                 
+                android.util.Log.d("NOTIFICATION_LOG", "New message added in chat $chatId: ${message.text} from ${message.senderId}. isInitialLoad: $isInitialLoad")
+
                 if (!isInitialLoad && message.senderId != currentUserId && message.timestamp > lastSeen) {
+                    android.util.Log.d("NOTIFICATION_LOG", "Triggering notification for chat $chatId")
                     fetchUserNameAndNotify(message.senderId, message.text, chatId)
+                } else {
+                    android.util.Log.d("NOTIFICATION_LOG", "Notification skipped. Reason: initialLoad=$isInitialLoad, isSelfMessage=${message.senderId == currentUserId}, isOld=${message.timestamp <= lastSeen}")
                 }
                 
                 if (message.timestamp > prefs.getLastSeenTimestamp(chatId)) {
@@ -77,6 +82,7 @@ class MessageNotificationManager @Inject constructor(
 
         messageRef.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                android.util.Log.d("NOTIFICATION_LOG", "Initial load complete for chat $chatId")
                 isInitialLoad = false
             }
             override fun onCancelled(error: DatabaseError) {
@@ -99,8 +105,13 @@ class MessageNotificationManager @Inject constructor(
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val message = snapshot.getValue(GroupMessage::class.java) ?: return
 
+                android.util.Log.d("NOTIFICATION_LOG", "New message in group $groupId: ${message.text}. isInitialLoad: $isInitialLoad")
+
                 if (!isInitialLoad && message.senderId != currentUserId && message.timestamp > lastSeen) {
+                    android.util.Log.d("NOTIFICATION_LOG", "Triggering group notification for group $groupId")
                     fetchGroupNameAndNotify(groupId, message.senderName, message.text)
+                } else {
+                    android.util.Log.d("NOTIFICATION_LOG", "Group Notification skipped. Reason: initialLoad=$isInitialLoad, isSelfMessage=${message.senderId == currentUserId}, isOld=${message.timestamp <= lastSeen}")
                 }
 
                 if (message.timestamp > prefs.getLastSeenTimestamp(groupId)) {
@@ -116,6 +127,7 @@ class MessageNotificationManager @Inject constructor(
 
         messageRef.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                android.util.Log.d("NOTIFICATION_LOG", "Initial load complete for group $groupId")
                 isInitialLoad = false
             }
             override fun onCancelled(error: DatabaseError) {

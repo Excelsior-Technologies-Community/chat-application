@@ -11,7 +11,7 @@ import com.aarav.chatapplication.R
 
 object NotificationHelper {
 
-    private const val EXTRA_NOTIFICATION_TYPE = "notification_type"
+    const val EXTRA_NOTIFICATION_TYPE = "notification_type"
     const val EXTRA_CHAT_RECEIVER_ID = "chat_receiver_id"
     const val EXTRA_CHAT_RECEIVER_NAME = "chat_receiver_name"
     const val EXTRA_GROUP_ID = "group_id"
@@ -58,6 +58,7 @@ object NotificationHelper {
             .build()
 
         val manager = context.getSystemService<NotificationManager>() ?: return
+        android.util.Log.d("NOTIFICATION_LOG", "Calling manager.notify for notificationId $notificationId")
         manager.notify(notificationId, notification)
     }
 
@@ -99,6 +100,7 @@ object NotificationHelper {
             .build()
 
         val manager = context.getSystemService<NotificationManager>() ?: return
+        android.util.Log.d("NOTIFICATION_LOG", "Calling manager.notify for Group notificationId $notificationId")
         manager.notify(notificationId, notification)
     }
 

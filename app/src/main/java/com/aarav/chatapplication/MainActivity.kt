@@ -1,8 +1,10 @@
 package com.aarav.chatapplication
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -55,8 +57,17 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var firebaseAuth: FirebaseAuth
 
+    private val intentState = mutableStateOf<Intent?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intentState.value = intent
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        intentState.value = intent
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
@@ -84,6 +95,40 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 var currentUserId by remember { mutableStateOf(firebaseAuth.currentUser?.uid) }
                 val navController = rememberNavController()
+
+                val mainViewModel: MainVM = hiltViewModel()
+                val currentUserName by mainViewModel.currentUserName.collectAsState()
+
+                // Handle Notification Navigation
+                val receivedIntent by intentState
+                LaunchedEffect(receivedIntent, currentUserId, currentUserName) {
+                    val intent = receivedIntent ?: return@LaunchedEffect
+                    val userId = currentUserId ?: return@LaunchedEffect
+                    
+                    val type = intent.getStringExtra(com.aarav.chatapplication.notification.NotificationHelper.EXTRA_NOTIFICATION_TYPE)
+                    if (type != null) {
+                        when (type) {
+                            com.aarav.chatapplication.notification.NotificationHelper.TYPE_CHAT -> {
+                                val receiverId = intent.getStringExtra(com.aarav.chatapplication.notification.NotificationHelper.EXTRA_CHAT_RECEIVER_ID)
+                                val receiverName = intent.getStringExtra(com.aarav.chatapplication.notification.NotificationHelper.EXTRA_CHAT_RECEIVER_NAME)
+                                if (receiverId != null) {
+                                    navController.navigate(
+                                        NavRoute.Chat.createRoute(receiverId, userId, currentUserName)
+                                    )
+                                }
+                            }
+                            com.aarav.chatapplication.notification.NotificationHelper.TYPE_GROUP -> {
+                                val groupId = intent.getStringExtra(com.aarav.chatapplication.notification.NotificationHelper.EXTRA_GROUP_ID)
+                                if (groupId != null) {
+                                    navController.navigate(
+                                        NavRoute.GroupChat.createRoute(groupId, userId, currentUserName)
+                                    )
+                                }
+                            }
+                        }
+                        intentState.value = null
+                    }
+                }
 
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
@@ -113,6 +158,14 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.CAMERA
                 }
 
+                val notificationPermission = remember {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Manifest.permission.POST_NOTIFICATIONS
+                    } else {
+                        null
+                    }
+                }
+
                 var isAudioPermissionGranted = remember {
                     ContextCompat.checkSelfPermission(
                         context,
@@ -127,6 +180,13 @@ class MainActivity : ComponentActivity() {
                     ) == PackageManager.PERMISSION_GRANTED
                 }
 
+                var isNotificationPermissionGranted = remember {
+                    notificationPermission == null || ContextCompat.checkSelfPermission(
+                        context,
+                        notificationPermission
+                    ) == PackageManager.PERMISSION_GRANTED
+                }
+
                 val launcher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
                 ) { granted ->
@@ -137,8 +197,13 @@ class MainActivity : ComponentActivity() {
                 ) { granted ->
                     isCameraPermissionGranted = granted
                 }
+                val launcher3 = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    isNotificationPermissionGranted = granted
+                }
 
-                LaunchedEffect(isAudioPermissionGranted, isCameraPermissionGranted) {
+                LaunchedEffect(isAudioPermissionGranted, isCameraPermissionGranted, isNotificationPermissionGranted) {
                     if (!isAudioPermissionGranted) {
                         launcher.launch(audioPermission)
                     }
@@ -146,9 +211,11 @@ class MainActivity : ComponentActivity() {
                     if (!isCameraPermissionGranted && isAudioPermissionGranted) {
                         launcher2.launch(cameraPermission)
                     }
-                }
 
-                val mainViewModel: MainVM = hiltViewModel()
+                    if (!isNotificationPermissionGranted && isCameraPermissionGranted && isAudioPermissionGranted) {
+                        notificationPermission?.let { launcher3.launch(it) }
+                    }
+                }
 
                 val callViewModel: CallViewModel = hiltViewModel()
 

@@ -11,8 +11,11 @@ import androidx.core.content.getSystemService
 object NotificationChannels {
 
     const val CHANNEL_ID_MESSAGES = "chat_messages"
+    const val CHANNEL_ID_SERVICE = "chat_service"
     private const val CHANNEL_NAME_MESSAGES = "Chat Messages"
+    private const val CHANNEL_NAME_SERVICE = "Chat Service Status"
     private const val CHANNEL_DESC_MESSAGES = "Notifications for new chat and group messages"
+    private const val CHANNEL_DESC_SERVICE = "Shows when the app is monitoring for new messages"
 
     fun createAll(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -36,7 +39,17 @@ object NotificationChannels {
                 )
             }
 
+            val serviceChannel = NotificationChannel(
+                CHANNEL_ID_SERVICE,
+                CHANNEL_NAME_SERVICE,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = CHANNEL_DESC_SERVICE
+                setShowBadge(false)
+            }
+
             notificationManager.createNotificationChannel(messageChannel)
+            notificationManager.createNotificationChannel(serviceChannel)
         }
     }
 }
